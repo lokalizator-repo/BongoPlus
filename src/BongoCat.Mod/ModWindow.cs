@@ -100,7 +100,7 @@ internal sealed class ModWindow : MonoBehaviour
         scroll.movementType = ScrollRect.MovementType.Clamped;
         scroll.scrollSensitivity = 25;
 
-        _status = NativeStyle.Text(_panel, "F8 to toggle • v" + Plugin.Version, 12);
+        _status = NativeStyle.Text(_panel, "F9 to toggle • v" + Plugin.Version, 12);
         _status.rectTransform.anchorMin = Vector2.zero;
         _status.rectTransform.anchorMax = new Vector2(1, 0);
         NativeStyle.Offsets(_status.rectTransform, new Vector2(18, 10), new Vector2(-18, 48));
@@ -129,7 +129,7 @@ internal sealed class ModWindow : MonoBehaviour
     private void Update()
     {
         if (!_canvas) return;
-        if (Input.GetKeyDown(KeyCode.F8)) Toggle();
+        if (Input.GetKeyDown(KeyCode.F9)) Toggle();
         if (!_panel.gameObject.activeSelf || Time.realtimeSinceStartup < _nextRefresh) return;
         _nextRefresh = Time.realtimeSinceStartup + 0.5f;
         if (_balance) _balance.text = "Available points: " + GameAccess.Balance.ToString("N0", CultureInfo.InvariantCulture);

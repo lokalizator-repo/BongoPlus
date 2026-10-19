@@ -66,7 +66,7 @@ public sealed class Plugin : BaseUnityPlugin
                 {
                     _window = gameObject.AddComponent<ModWindow>();
                     _window.Initialize(this);
-                    Logger.LogInfo("Native mod window created. Press F8 to open.");
+                    Logger.LogInfo("Native mod window created. Press F9 to open.");
                 }
             }
             Balance.Tick();
