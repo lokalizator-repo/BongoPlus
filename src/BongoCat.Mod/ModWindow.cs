@@ -320,7 +320,8 @@ internal sealed class ModWindow : MonoBehaviour
             label.rectTransform.anchorMax = new Vector2(1, 0.25f);
             if (cosmetic.IsEmote)
             {
-                var toggle = NativeStyle.Button(card.transform, _plugin.Wheel.Contains(cosmetic.Id) ? "-" : "+",
+                var toggle = NativeStyle.IconButton(card.transform,
+                    _plugin.Wheel.Contains(cosmetic.Id) ? ControlIcon.Remove : ControlIcon.Add,
                     () => _plugin.Run(() =>
                     {
                         _error = null;

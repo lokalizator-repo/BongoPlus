@@ -55,6 +55,24 @@ internal static class NativeStyle
 
     public static Button Button(Transform parent, string title, UnityEngine.Events.UnityAction click, float width = 0)
     {
+        var button = CreateButton(parent, title, click, width);
+        var label = Text(button.transform, title, 15);
+        Stretch(label.rectTransform, 5);
+        label.alignment = TextAlignmentOptions.Center;
+        return button;
+    }
+
+    public static Button IconButton(Transform parent, ControlIcon icon, UnityEngine.Events.UnityAction click)
+    {
+        var button = CreateButton(parent, icon.ToString(), click, 28);
+        var glyph = Rect("Glyph", button.transform);
+        Stretch(glyph, 4);
+        glyph.gameObject.AddComponent<ControlGlyph>().Icon = icon;
+        return button;
+    }
+
+    private static Button CreateButton(Transform parent, string title, UnityEngine.Events.UnityAction click, float width)
+    {
         var rect = Rect(title, parent);
         var image = Image(rect, UiSpriteRole.FooterButtonDefault);
         var button = rect.gameObject.AddComponent<Button>();
@@ -64,9 +82,6 @@ internal static class NativeStyle
         colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
         button.colors = colors;
         button.onClick.AddListener(click);
-        var label = Text(rect, title, 15);
-        Stretch(label.rectTransform, 5);
-        label.alignment = TextAlignmentOptions.Center;
         var layout = rect.gameObject.AddComponent<LayoutElement>();
         layout.preferredHeight = 32;
         if (width > 0) layout.preferredWidth = width;

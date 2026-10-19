@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>BongoCat.Mod</AssemblyName>
     <RootNamespace>BongoCatMod</RootNamespace>
-    <Version>0.1.9</Version>
+    <Version>0.1.10</Version>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
     <GameDirectory Condition="'$(GameDirectory)' == ''">D:/Gaming/Launchers/Steam/steamapps/common/BongoCat</GameDirectory>

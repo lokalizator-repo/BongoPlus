@@ -104,12 +104,12 @@ internal sealed class WheelPager : MonoBehaviour
         if (!_wheel) return;
         if (!_previous && NativeStyle.Font)
         {
-            _previous = NativeStyle.Button(_parent, "<", () => ChangePage(-1), 32);
-            _next = NativeStyle.Button(_parent, ">", () => ChangePage(1), 32);
+            _previous = NativeStyle.IconButton(_parent, ControlIcon.Previous, () => ChangePage(-1));
+            _next = NativeStyle.IconButton(_parent, ControlIcon.Next, () => ChangePage(1));
             _pageLabel = NativeStyle.Text(_parent, "", 12);
-            ((RectTransform)_previous.transform).sizeDelta = new Vector2(32, 28);
-            ((RectTransform)_next.transform).sizeDelta = new Vector2(32, 28);
-            _pageLabel.rectTransform.sizeDelta = new Vector2(56, 28);
+            ((RectTransform)_previous.transform).sizeDelta = new Vector2(28, 28);
+            ((RectTransform)_next.transform).sizeDelta = new Vector2(28, 28);
+            _pageLabel.rectTransform.sizeDelta = new Vector2(56, 24);
             _pageLabel.alignment = TextAlignmentOptions.Center;
             _dirty = true;
             Present();
@@ -161,18 +161,19 @@ internal sealed class WheelPager : MonoBehaviour
         }
         if (_previous)
         {
-            var nav = WheelLayout.PageCount(_ids.Length) > 1
-                ? new Vector2((float)plan.NavigationX, (float)plan.NavigationY) + _lastWorkArea.position
-                : new Vector2((float)plan.Slots[0].X, (float)plan.Slots[0].Y) + _lastWorkArea.position;
-            var offset = (float)(50 * uiScale * plan.Scale);
-            Place((RectTransform)_previous.transform, nav + Vector2.left * offset, (float)plan.Scale);
-            Place((RectTransform)_next.transform, nav + Vector2.right * offset, (float)plan.Scale);
-            Place(_pageLabel.rectTransform, nav, (float)plan.Scale);
+            var previous = new Vector2((float)plan.Previous.X, (float)plan.Previous.Y) + _lastWorkArea.position;
+            var next = new Vector2((float)plan.Next.X, (float)plan.Next.Y) + _lastWorkArea.position;
+            var counter = new Vector2((float)plan.Counter.X, (float)plan.Counter.Y) + _lastWorkArea.position;
+            Place((RectTransform)_previous.transform, previous, (float)plan.Scale);
+            Place((RectTransform)_next.transform, next, (float)plan.Scale);
+            Place(_pageLabel.rectTransform, counter, (float)plan.Scale);
             _pageLabel.text = (_page + 1) + " / " + WheelLayout.PageCount(_ids.Length);
             if (WheelLayout.PageCount(_ids.Length) > 1)
             {
-                min = Vector2.Min(min, nav - new Vector2(72, 14) * (float)(uiScale * plan.Scale));
-                max = Vector2.Max(max, nav + new Vector2(72, 14) * (float)(uiScale * plan.Scale));
+                var arrowHalf = Vector2.one * (float)(14 * uiScale * plan.Scale);
+                var counterHalf = new Vector2(28, 12) * (float)(uiScale * plan.Scale);
+                min = Vector2.Min(min, Vector2.Min(previous - arrowHalf, counter - counterHalf));
+                max = Vector2.Max(max, Vector2.Max(next + arrowHalf, counter + counterHalf));
             }
         }
         _hitArea = Rect.MinMaxRect(min.x - 8, min.y - 8, max.x + 8, max.y + 8);

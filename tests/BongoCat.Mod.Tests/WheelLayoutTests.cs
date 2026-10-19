@@ -8,7 +8,7 @@ internal static class WheelLayoutTests
             WheelLayout.PageCount(10000) == 1250, "Wheel pagination imposes no eight-item selection limit");
         var random = new Random(3419430);
         var bounded = true;
-        var separated = true;
+        var sideControls = true;
         var centered = true;
         for (var i = 0; i < 10000; i++)
         {
@@ -26,20 +26,36 @@ internal static class WheelLayoutTests
                 bounded &= p.X - half >= 12 - 1e-6 && p.X + half <= width - 12 + 1e-6 &&
                     p.Y - half >= 12 - 1e-6 && p.Y + half <= height - 12 + 1e-6;
             if (WheelLayout.PageCount(count) > 1)
-                bounded &= plan.NavigationX - 72 * uiScale * plan.Scale >= 12 - 1e-6 &&
-                    plan.NavigationX + 72 * uiScale * plan.Scale <= width - 12 + 1e-6 &&
-                    plan.NavigationY - 14 * uiScale * plan.Scale >= 12 - 1e-6 &&
-                    plan.NavigationY + 14 * uiScale * plan.Scale <= height - 12 + 1e-6;
-            for (var a = 0; a < plan.Slots.Length; a++)
-                for (var b = a + 1; b < plan.Slots.Length; b++)
-                    separated &= Math.Max(Math.Abs(plan.Slots[a].X - plan.Slots[b].X),
-                        Math.Abs(plan.Slots[a].Y - plan.Slots[b].Y)) >= icon * plan.Scale - 1e-6;
+            {
+                foreach (var arrow in new[] { plan.Previous, plan.Next })
+                    bounded &= arrow.X - 14 * uiScale * plan.Scale >= 12 - 1e-6 &&
+                        arrow.X + 14 * uiScale * plan.Scale <= width - 12 + 1e-6 &&
+                        arrow.Y - 14 * uiScale * plan.Scale >= 12 - 1e-6 &&
+                        arrow.Y + 14 * uiScale * plan.Scale <= height - 12 + 1e-6;
+                bounded &= plan.Counter.X - 28 * uiScale * plan.Scale >= 12 - 1e-6 &&
+                    plan.Counter.X + 28 * uiScale * plan.Scale <= width - 12 + 1e-6 &&
+                    plan.Counter.Y - 12 * uiScale * plan.Scale >= 12 - 1e-6 &&
+                    plan.Counter.Y + 12 * uiScale * plan.Scale <= height - 12 + 1e-6;
+                sideControls &= plan.Previous.X + 14 * uiScale * plan.Scale < plan.Slots[0].X - half &&
+                    plan.Next.X - 14 * uiScale * plan.Scale > plan.Slots[^1].X + half &&
+                    Math.Abs(plan.Previous.Y - plan.Slots[0].Y) < 1e-6 &&
+                    Math.Abs(plan.Next.Y - plan.Slots[^1].Y) < 1e-6;
+            }
             if (plan.Slots.Length > 1)
                 centered &= Math.Abs(plan.Slots[0].Y - plan.Slots[^1].Y) < 1e-6;
         }
         check(bounded, "10000 wheel layouts keep every icon and page control within screen margins");
-        check(separated, "Wheel icons do not overlap across UI scales and screen sizes");
+        check(sideControls, "Page arrows stay beside the emotes with a visible gap");
         check(centered, "Partial pages retain a centered arc");
+        var native = WheelLayout.Arrange(16, 960, 200, 1920, 1080, 64, 100, 1);
+        var nativeSpacing = native.Scale == 1;
+        for (var i = 0; i < 8; i++)
+        {
+            var angle = (-80d + i * 160d / 7) * Math.PI / 180;
+            nativeSpacing &= Math.Abs(native.Slots[i].X - (960 + 100 * Math.Sin(angle))) < 1e-6 &&
+                Math.Abs(native.Slots[i].Y - (200 + 100 * Math.Cos(angle))) < 1e-6;
+        }
+        check(nativeSpacing, "Wheel spacing matches the native radius and twenty degrees per entry");
         check(WheelLayout.Arrange(0, 0, 0, 1920, 1080, 64, 100, 1).Slots.Length == 0,
             "An empty wheel needs no visible slots");
     }
