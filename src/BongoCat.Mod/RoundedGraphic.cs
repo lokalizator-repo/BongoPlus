@@ -9,10 +9,12 @@ internal sealed class RoundedGraphic : MaskableGraphic
 {
     private static readonly Dictionary<string, Texture2D> Textures = new Dictionary<string, Texture2D>();
     private ControlIcon? _icon;
+    private bool _background = true;
 
-    public void Initialize(ControlIcon icon)
+    public void Initialize(ControlIcon icon, bool background = true)
     {
         _icon = icon;
+        _background = background;
         SetAllDirty();
     }
 
@@ -30,9 +32,9 @@ internal sealed class RoundedGraphic : MaskableGraphic
             var rect = rectTransform.rect;
             var width = Math.Max(8, Math.Min(128, (int)Math.Round(rect.width)));
             var height = Math.Max(8, Math.Min(128, (int)Math.Round(rect.height)));
-            var key = (_icon?.ToString() ?? "selection") + ":" + width + ":" + height;
+            var key = (_icon?.ToString() ?? "selection") + ":" + width + ":" + height + ":" + _background;
             if (Textures.TryGetValue(key, out var texture)) return texture;
-            var bytes = _icon.HasValue ? ControlButtonArt.Render(_icon.Value, width, height)
+            var bytes = _icon.HasValue ? ControlButtonArt.Render(_icon.Value, width, height, _background)
                 : ControlButtonArt.RenderSelection(width, height);
             var pixels = new Color[bytes.Length / 4];
             for (var i = 0; i < pixels.Length; i++)

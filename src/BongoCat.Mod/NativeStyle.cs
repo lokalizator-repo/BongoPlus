@@ -43,7 +43,7 @@ internal static class NativeStyle
     {
         var rect = Rect("Text", parent);
         var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
-        text.font = Font;
+        text.font = ModFonts.Prepare(Font);
         text.fontSize = size;
         text.text = value;
         text.richText = false;
@@ -82,6 +82,22 @@ internal static class NativeStyle
         return button;
     }
 
+    public static Button NavButton(Transform parent, string title, ControlIcon icon, UnityEngine.Events.UnityAction click)
+    {
+        var button = Button(parent, title, click);
+        var label = button.GetComponentInChildren<TMP_Text>();
+        label.fontSize = 13;
+        Offsets(label.rectTransform, new Vector2(32, 4), new Vector2(-5, -4));
+        var glyph = Rect("Icon", button.transform);
+        glyph.anchorMin = glyph.anchorMax = new Vector2(0, 0.5f);
+        glyph.pivot = new Vector2(0, 0.5f);
+        glyph.anchoredPosition = new Vector2(5, 0);
+        glyph.sizeDelta = new Vector2(24, 24);
+        glyph.gameObject.AddComponent<RoundedGraphic>().Initialize(icon, false);
+        glyph.GetComponent<RoundedGraphic>().raycastTarget = false;
+        return button;
+    }
+
     private static Button CreateButton(Transform parent, string title, UnityEngine.Events.UnityAction click, float width)
     {
         var rect = Rect(title, parent);
@@ -103,27 +119,43 @@ internal static class NativeStyle
     public static TMP_InputField Input(Transform parent, string initial, string placeholder)
     {
         var rect = Rect("Input", parent);
-        var image = Image(rect, UiSpriteRole.InputField);
+        rect.gameObject.SetActive(false);
+        var image = Image(rect, UiSpriteRole.FooterButtonDefault);
         var viewport = Rect("Viewport", rect);
         Stretch(viewport, 7);
         viewport.gameObject.AddComponent<RectMask2D>();
         var label = Text(viewport, initial);
         Stretch(label.rectTransform);
         label.alignment = TextAlignmentOptions.MidlineLeft;
+        label.overflowMode = TextOverflowModes.Overflow;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
         var hint = Text(viewport, placeholder);
         Stretch(hint.rectTransform);
         hint.alignment = TextAlignmentOptions.MidlineLeft;
+        hint.overflowMode = TextOverflowModes.Overflow;
+        hint.textWrappingMode = TextWrappingModes.NoWrap;
         var field = rect.gameObject.AddComponent<TMP_InputField>();
         field.textViewport = viewport;
         field.textComponent = label;
+        field.fontAsset = label.font;
+        field.pointSize = 16;
         field.placeholder = hint;
         field.targetGraphic = image;
         field.text = initial;
         field.lineType = TMP_InputField.LineType.SingleLine;
+        field.richText = false;
+        field.customCaretColor = true;
+        field.caretColor = new Color(0.9f, 0.94f, 0.93f);
+        field.selectionColor = new Color(0.5f, 0.75f, 0.65f, 0.35f);
         field.characterLimit = 80;
         var layout = rect.gameObject.AddComponent<LayoutElement>();
         layout.preferredHeight = 34;
         layout.flexibleWidth = 1;
+        rect.gameObject.SetActive(true);
+        field.ForceLabelUpdate();
+        hint.text = placeholder;
+        hint.enabled = string.IsNullOrEmpty(initial);
+        field.onValueChanged.AddListener(value => hint.enabled = string.IsNullOrEmpty(value));
         return field;
     }
 
@@ -167,8 +199,10 @@ internal sealed class ModTextTheme : ThemedComponent
         if (TryResolve(UiColorRole.NormalText, theme, legacy, out var color)) text.color = color;
         if (TryResolve(UiFontRole.Body, theme, legacy, out var entry))
         {
-            text.font = entry.Font;
+            text.font = ModFonts.Prepare(entry.Font);
             if (entry.Material) text.fontSharedMaterial = entry.Material;
+            var field = GetComponentInParent<TMP_InputField>();
+            if (field && field.textComponent == text) field.fontAsset = text.font;
         }
     }
 }

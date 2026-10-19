@@ -122,46 +122,67 @@ internal sealed partial class ModWindow
 
     private void CreatePresets()
     {
-        NativeStyle.Label(_body, "APPEARANCE PRESETS", 26, 16);
-        NativeStyle.Label(_body, "Save your current skin and hat as a set. Reuse a name to replace its saved appearance.", 48, 12)
-            .textWrappingMode = TextWrappingModes.Normal;
         var actions = NativeStyle.Row(_body);
         var name = NativeStyle.Input(actions, "", "Preset name");
         name.characterLimit = 40;
-        var save = NativeStyle.Button(actions, "Save", () => _plugin.Run(() =>
+        var save = NativeStyle.IconButton(actions, ControlIcon.Save, () => _plugin.Run(() =>
         {
             _plugin.Cosmetics.SavePreset(name.text);
             name.text = "";
             _error = null;
             FillPresets();
-        }), 62);
+        }));
+        name.onSubmit.AddListener(_ => save.onClick.Invoke());
         Hint(save.transform, "Save your current skin and hat. The same name replaces an existing preset.");
+        _presetEmpty = NativeStyle.Label(_body, "Choose a skin and hat in the catalog, then name and save your set here.", 48, 13);
+        _presetEmpty.textWrappingMode = TextWrappingModes.Normal;
         _presetList = NativeStyle.Rect("Presets", _body);
-        NativeStyle.Vertical(_presetList, 5);
+        var layout = _presetList.gameObject.AddComponent<GridLayoutGroup>();
+        layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        layout.constraintCount = 2;
+        layout.cellSize = new Vector2(183, 140);
+        layout.spacing = new Vector2(8, 8);
+        _presetList.gameObject.AddComponent<LayoutElement>();
         FillPresets();
-        NativeStyle.Button(_body, "Restore equipped appearance", () => _plugin.Run(_plugin.Cosmetics.Restore));
     }
 
     private void FillPresets()
     {
         ClearChildren(_presetList);
-        if (_plugin.Cosmetics.Presets.Count == 0)
-            NativeStyle.Label(_presetList, "Save a skin and hat together for one-click switching.", 32, 12).textWrappingMode = TextWrappingModes.Normal;
+        var count = _plugin.Cosmetics.Presets.Count;
+        _presetList.gameObject.SetActive(count > 0);
+        _presetEmpty.gameObject.SetActive(count == 0);
+        _presetList.GetComponent<LayoutElement>().preferredHeight = ((count + 1) / 2) * 148 - 8;
         foreach (var preset in _plugin.Cosmetics.Presets.ToArray())
         {
-            var row = NativeStyle.Row(_presetList);
-            var apply = NativeStyle.Button(row, preset.Name, () => _plugin.Run(() =>
+            var apply = NativeStyle.Button(_presetList, preset.Name, () => _plugin.Run(() =>
             {
                 _plugin.Cosmetics.ApplyPreset(preset);
                 _error = null;
-                FillGrid();
+                FillPresets();
             }));
+            var name = apply.GetComponentInChildren<TMP_Text>();
+            name.fontSize = 12;
+            name.rectTransform.anchorMax = new Vector2(1, 0.22f);
+            var preview = NativeStyle.Rect("Set preview", apply.transform);
+            preview.anchorMin = new Vector2(0, 0.22f);
+            preview.anchorMax = Vector2.one;
+            NativeStyle.Offsets(preview, new Vector2(8, 4), new Vector2(-8, -8));
+            preview.gameObject.AddComponent<PresetPreview>().Initialize(preset);
+            var frame = NativeStyle.Rect("Selected preset", apply.transform);
+            NativeStyle.Stretch(frame);
+            frame.gameObject.AddComponent<RoundedGraphic>().InitializeSelection();
+            frame.gameObject.SetActive(_plugin.Cosmetics.Selected(preset));
             Hint(apply.transform, preset.Name + "\nApply this skin and hat.");
-            var remove = NativeStyle.IconButton(row, ControlIcon.Remove, () => _plugin.Run(() =>
+            var remove = NativeStyle.IconButton(apply.transform, ControlIcon.Trash, () => _plugin.Run(() =>
             {
                 _plugin.Cosmetics.DeletePreset(preset);
                 FillPresets();
             }));
+            var removeRect = (RectTransform)remove.transform;
+            removeRect.anchorMin = removeRect.anchorMax = removeRect.pivot = Vector2.one;
+            removeRect.sizeDelta = new Vector2(23, 23);
+            removeRect.anchoredPosition = new Vector2(-4, -4);
             Hint(remove.transform, "Delete preset: " + preset.Name);
         }
     }
@@ -184,8 +205,7 @@ internal sealed partial class ModWindow
         _wheelSignature = string.Join(",", ids);
         var pages = WheelLayout.PageCount(ids.Length);
         _wheelPage = Mathf.Clamp(_wheelPage, 0, pages - 1);
-        NativeStyle.Label(_wheelEditor, "YOUR EMOTE WHEEL", 25, 16);
-        NativeStyle.Label(_wheelEditor, "Drag onto a slot to reorder. Drop onto a page arrow to move between pages.", 42, 12)
+        NativeStyle.Label(_wheelEditor, "Drag to reorder. Drop on an arrow to move between pages.", 32, 12)
             .textWrappingMode = TextWrappingModes.Normal;
         if (ids.Length == 0)
         {
@@ -247,7 +267,8 @@ internal sealed partial class ModWindow
 
     private void AddWheelPageButton(Transform parent, string title, int direction, bool available)
     {
-        var button = NativeStyle.Button(parent, title, () => { _wheelPage += direction; FillWheelEditor(); });
+        var button = NativeStyle.IconButton(parent, direction < 0 ? ControlIcon.Previous : ControlIcon.Next,
+            () => { _wheelPage += direction; FillWheelEditor(); });
         button.interactable = available;
         if (!available) return;
         button.gameObject.AddComponent<WheelDropTarget>().Drop = id => _plugin.Run(() =>

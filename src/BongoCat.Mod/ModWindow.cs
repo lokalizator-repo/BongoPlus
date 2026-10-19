@@ -8,6 +8,7 @@ using BongoCat.UiThemes;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace BongoCatMod;
 
@@ -26,7 +27,6 @@ internal sealed partial class ModWindow : MonoBehaviour
     private RectTransform _grid = null!;
     private TextMeshProUGUI _pageLabel = null!;
     private TMP_InputField _search = null!;
-    private TextMeshProUGUI _catalogHint = null!;
     private Button _menuButton = null!;
     private string _slot = "skin";
     private int _page;
@@ -52,6 +52,7 @@ internal sealed partial class ModWindow : MonoBehaviour
     private Button _nextPage = null!;
     private TextMeshProUGUI _emptyState = null!;
     private RectTransform _presetList = null!;
+    private TextMeshProUGUI _presetEmpty = null!;
     private RectTransform _wheelEditor = null!;
     private bool _editingWheel;
     private int _cosmeticView;
@@ -64,6 +65,16 @@ internal sealed partial class ModWindow : MonoBehaviour
     private float _hoverAt;
     private Rect _lastWorkArea;
     private Button[] _tabs = Array.Empty<Button>();
+    public bool IsTyping
+    {
+        get
+        {
+            var selected = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
+            if (selected == null || !selected || !_canvas || !selected.transform.IsChildOf(_canvas.transform)) return false;
+            var input = selected.GetComponent<TMP_InputField>();
+            return input && input.isFocused;
+        }
+    }
 
     public void Initialize(Plugin plugin)
     {
@@ -104,7 +115,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         title.rectTransform.anchorMax = Vector2.one;
         NativeStyle.Offsets(title.rectTransform, Vector2.zero, new Vector2(-45, 0));
         title.alignment = TextAlignmentOptions.MidlineLeft;
-        var close = NativeStyle.Button(header, "X", Toggle);
+        var close = NativeStyle.IconButton(header, ControlIcon.Close, Toggle);
         var closeRect = (RectTransform)close.transform;
         closeRect.anchorMin = closeRect.anchorMax = new Vector2(1, 0.5f);
         closeRect.pivot = new Vector2(1, 0.5f);
@@ -116,9 +127,9 @@ internal sealed partial class ModWindow : MonoBehaviour
         NativeStyle.Offsets(tabs, new Vector2(16, -87), new Vector2(-16, -51));
         tabs.gameObject.AddComponent<HorizontalLayoutGroup>().spacing = 6;
         _tabs = new[] {
-            NativeStyle.Button(tabs, "General", () => ShowTab(0)),
-            NativeStyle.Button(tabs, "Lobby", () => ShowTab(1)),
-            NativeStyle.Button(tabs, "Cosmetics", () => ShowTab(2)) };
+            NativeStyle.NavButton(tabs, "General", ControlIcon.Settings, () => ShowTab(0)),
+            NativeStyle.NavButton(tabs, "Lobby", ControlIcon.Lobby, () => ShowTab(1)),
+            NativeStyle.NavButton(tabs, "Cosmetics", ControlIcon.Palette, () => ShowTab(2)) };
 
         var viewport = NativeStyle.Rect("Viewport", _panel);
         viewport.anchorMin = Vector2.zero;
@@ -335,21 +346,38 @@ internal sealed partial class ModWindow : MonoBehaviour
 
     private void Cosmetics()
     {
-        ToggleRow("Share standard appearance in lobby", () => _plugin.Cosmetics.Publish,
-            value => _plugin.Cosmetics.SetPublish(value), false);
-        var views = NativeStyle.Row(_body);
+        var views = NativeStyle.Row(_body, 30);
         var names = new[] { "Catalog", "Presets", "Emote wheel" };
+        var title = NativeStyle.Text(views, names[_cosmeticView], 17);
+        title.alignment = TextAlignmentOptions.MidlineLeft;
+        title.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+        var icons = new[] { ControlIcon.Catalog, ControlIcon.Presets, ControlIcon.Wheel };
         for (var i = 0; i < names.Length; i++)
         {
             var view = i;
-            var button = NativeStyle.Button(views, names[i], () =>
+            var button = NativeStyle.IconButton(views, icons[i], () =>
             {
                 if (!_building) _scrollPositions[ScrollIndex] = Math.Max(0, _body.anchoredPosition.y);
                 _cosmeticView = view;
                 ShowTab(2, false);
             });
             button.targetGraphic.color = view == _cosmeticView ? new Color(0.76f, 1f, 0.88f) : Color.white;
+            Hint(button.transform, names[i]);
         }
+        var share = NativeStyle.IconButton(views, ControlIcon.Share, () => _plugin.Run(() =>
+        {
+            _plugin.Cosmetics.SetPublish(!_plugin.Cosmetics.Publish);
+            ShowTab(2);
+        }));
+        share.targetGraphic.color = _plugin.Cosmetics.Publish ? new Color(0.76f, 1f, 0.88f) : new Color(0.55f, 0.55f, 0.55f);
+        Hint(share.transform, _plugin.Cosmetics.Publish ? "Lobby sharing is on. Click to use local appearance only." : "Lobby sharing is off. Click to share your appearance.");
+        var restore = NativeStyle.IconButton(views, ControlIcon.Reset, () => _plugin.Run(() =>
+        {
+            _plugin.Cosmetics.Restore();
+            FillGrid();
+            if (_presetList) FillPresets();
+        }));
+        Hint(restore.transform, "Restore your normally equipped skin and hat");
         _editingWheel = _cosmeticView == 2;
         if (_editingWheel)
         {
@@ -363,23 +391,31 @@ internal sealed partial class ModWindow : MonoBehaviour
             CreatePresets();
             return;
         }
-        var slots = NativeStyle.Row(_body);
+        var slots = NativeStyle.Row(_body, 32);
+        slots.GetComponent<HorizontalLayoutGroup>().spacing = 5;
         foreach (var slot in new[] { "skin", "hat", "emote" })
         {
             var selectedSlot = slot;
-            NativeStyle.Button(slots, slot == "emote" ? "Emotes" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(slot), () =>
+            var button = NativeStyle.IconButton(slots, slot == "skin" ? ControlIcon.Skin : slot == "hat" ? ControlIcon.Hat : ControlIcon.Emote, () =>
             {
                 _slot = selectedSlot;
                 _page = 0;
                 _editingWheel = false;
-                FillGrid();
-                StateChanged();
+                ShowTab(2);
             });
+            button.targetGraphic.color = slot == _slot ? new Color(0.76f, 1f, 0.88f) : Color.white;
+            Hint(button.transform, slot == "emote" ? "Emotes" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(slot));
         }
-        _search = NativeStyle.Input(_body, _query, "Search cosmetics");
+        _search = NativeStyle.Input(slots, _query, "Search cosmetics");
+        NativeStyle.Offsets(_search.textViewport, new Vector2(7, 7), new Vector2(-27, -7));
         _search.onValueChanged.AddListener(value => { _query = value; _page = 0; FillGrid(); StateChanged(); });
-        var filters = NativeStyle.Row(_body);
-        _favoritesButton = NativeStyle.Button(filters, "", () =>
+        var clear = NativeStyle.IconButton(_search.transform, ControlIcon.Close, () => { _search.text = ""; });
+        var clearRect = (RectTransform)clear.transform;
+        clearRect.anchorMin = clearRect.anchorMax = clearRect.pivot = new Vector2(1, 0.5f);
+        clearRect.sizeDelta = new Vector2(22, 22);
+        clearRect.anchoredPosition = new Vector2(-4, 0);
+        Hint(clear.transform, "Clear search");
+        _favoritesButton = NativeStyle.IconButton(slots, ControlIcon.Favorite, () =>
         {
             _favoritesOnly = !_favoritesOnly;
             _page = 0;
@@ -387,9 +423,6 @@ internal sealed partial class ModWindow : MonoBehaviour
             StateChanged();
         });
         Hint(_favoritesButton.transform, "Show only favorites. Starred items appear first in the full catalog too.");
-        NativeStyle.Button(filters, "Clear search", () => { _search.text = ""; });
-        _catalogHint = NativeStyle.Label(_body, "", 32, 12);
-        _catalogHint.textWrappingMode = TextWrappingModes.Normal;
         _emptyState = NativeStyle.Label(_body, "", 48, 14);
         _emptyState.textWrappingMode = TextWrappingModes.Normal;
         _grid = NativeStyle.Rect("Cosmetic grid", _body);
@@ -400,17 +433,13 @@ internal sealed partial class ModWindow : MonoBehaviour
         grid.constraintCount = 4;
         _grid.gameObject.AddComponent<LayoutElement>().preferredHeight = 282;
         var pages = NativeStyle.Row(_body);
-        _previousPage = NativeStyle.Button(pages, "Previous", () => { if (_page > 0) _page--; FillGrid(); StateChanged(); });
+        _previousPage = NativeStyle.IconButton(pages, ControlIcon.Previous, () => { if (_page > 0) _page--; FillGrid(); StateChanged(); });
         _pageLabel = NativeStyle.Text(pages, "", 13);
         _pageLabel.alignment = TextAlignmentOptions.Center;
-        _pageLabel.gameObject.AddComponent<LayoutElement>().preferredWidth = 80;
-        _nextPage = NativeStyle.Button(pages, "Next", () => { _page++; FillGrid(); StateChanged(); });
-        NativeStyle.Button(_body, "Restore equipped appearance", () => _plugin.Run(() =>
-        {
-            _plugin.Cosmetics.Restore();
-            FillGrid();
-        }));
-        NativeStyle.Label(_body, "Appearance is saved between launches. Steam inventory is unchanged.", 42, 12).textWrappingMode = TextWrappingModes.Normal;
+        _pageLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+        _nextPage = NativeStyle.IconButton(pages, ControlIcon.Next, () => { _page++; FillGrid(); StateChanged(); });
+        Hint(_previousPage.transform, "Previous page");
+        Hint(_nextPage.transform, "Next page");
         FillGrid();
     }
 
@@ -418,25 +447,20 @@ internal sealed partial class ModWindow : MonoBehaviour
     {
         if (!_grid) return;
         HideTooltip();
-        _favoritesButton.GetComponentInChildren<TMP_Text>().text = _favoritesOnly ? "Favorites only" : "All cosmetics";
         _favoritesButton.targetGraphic.color = _favoritesOnly ? new Color(1f, 0.88f, 0.58f) : Color.white;
-        _catalogHint.text = _slot == "emote"
-            ? "Click an emote to send. Use + / - to add or remove it from your wheel."
-            : "Click an item to apply and save your appearance.";
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
         var items = _plugin.Cosmetics.Items(_slot, _query)
             .Where(item => !_favoritesOnly || _plugin.Cosmetics.IsFavorite(item.Id))
             .OrderByDescending(item => _plugin.Cosmetics.IsFavorite(item.Id)).ThenBy(item => item.ItemName).ToList();
         var pages = Math.Max(1, (items.Count + 11) / 12);
         _page = Mathf.Clamp(_page, 0, pages - 1);
-        if (_pageLabel) _pageLabel.text = (_page + 1) + " / " + pages;
+        if (_pageLabel) _pageLabel.text = (_page + 1) + " / " + pages + "  ·  " + items.Count + " items";
         _previousPage.interactable = _page > 0;
         _nextPage.interactable = _page + 1 < pages;
         _emptyState.gameObject.SetActive(items.Count == 0);
         _emptyState.text = _favoritesOnly ? "No favorite items match. Star items in All cosmetics or clear your search."
             : "No items match your search. Try another name or clear the search.";
         _grid.gameObject.SetActive(items.Count != 0);
-        _catalogHint.text += "  " + items.Count + " items.";
         StateChanged();
         foreach (var item in items.Skip(_page * 12).Take(12))
         {

@@ -16,7 +16,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.2.0";
+    public const string Version = "0.2.1";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -29,6 +29,17 @@ public sealed class Plugin : BaseUnityPlugin
     private ModWindow _window = null!;
     private bool _failed;
     private float _nextInit;
+
+    [HarmonyPatch(typeof(Helper.InputFieldCache), "get_FocusingInputField")]
+    private static class ModInputFocused
+    {
+        private static bool Prefix(ref bool __result)
+        {
+            if (!(Instance?._window?.IsTyping ?? false)) return true;
+            __result = true;
+            return false;
+        }
+    }
 
     private void Awake()
     {
@@ -120,6 +131,7 @@ public sealed class Plugin : BaseUnityPlugin
         if (_window) Destroy(_window);
         _harmony?.UnpatchSelf();
         Balance?.Dispose();
+        SpriteContentBounds.Dispose();
         Instance = null;
     }
 

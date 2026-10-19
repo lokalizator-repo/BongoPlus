@@ -63,6 +63,11 @@ internal sealed class CosmeticService
 
     public bool IsFavorite(int id) => _favorites.Contains(id);
 
+    private int CurrentItemId(string slot) => _selected.TryGetValue(slot, out var id) ? id :
+        CatCosmetics.Instance ? CatCosmetics.Instance.EquippedItems.FirstOrDefault(item => item.ItemSlot == slot)?.Id ?? -2 : -2;
+
+    public bool Selected(AppearancePreset preset) => CurrentItemId("skin") == preset.Skin && CurrentItemId("hat") == preset.Hat;
+
     public void ToggleFavorite(int id)
     {
         if (!_favorites.Add(id)) _favorites.Remove(id);
@@ -75,9 +80,7 @@ internal sealed class CosmeticService
         name = name.Trim();
         if (name.Length == 0 || name.Length > 40) throw new ArgumentException("Use a preset name with 1–40 characters.");
         if (!Cat.Instance || !CatCosmetics.Instance) throw new InvalidOperationException("Wait for your cat to load.");
-        int Current(string slot) => _selected.TryGetValue(slot, out var id) ? id :
-            CatCosmetics.Instance.EquippedItems.FirstOrDefault(item => item.ItemSlot == slot)?.Id ?? -2;
-        var preset = new AppearancePreset(name, Current("skin"), Current("hat"));
+        var preset = new AppearancePreset(name, CurrentItemId("skin"), CurrentItemId("hat"));
         var index = _presets.FindIndex(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         if (index >= 0) _presets[index] = preset;
         else _presets.Add(preset);

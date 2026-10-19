@@ -20,6 +20,11 @@ internal static class ControlArtTests
         }
         check(consistent, "Control buttons have transparent round corners and an opaque center at both display sizes");
         check(smoothed, "Every control icon has antialiased edge coverage");
+        check(Enum.GetValues<ControlIcon>().All(icon =>
+        {
+            var pixels = ControlButtonArt.Render(icon, 24, 24, false);
+            return pixels[3] == 0 && Enumerable.Range(0, pixels.Length / 4).Any(i => pixels[i * 4 + 3] > 0);
+        }), "Every navigation symbol renders visible strokes independently of its button background");
         var add = ControlButtonArt.Render(ControlIcon.Add, 28, 28);
         var remove = ControlButtonArt.Render(ControlIcon.Remove, 28, 28);
         var next = ControlButtonArt.Render(ControlIcon.Next, 28, 28);
@@ -49,8 +54,9 @@ internal static class ControlArtTests
     internal static void ExportPreview(string path)
     {
         var icons = Enum.GetValues<ControlIcon>();
-        var width = icons.Length * 128 + 16;
-        const int height = 224;
+        const int columns = 6;
+        var width = columns * 128 + 16;
+        var height = ((icons.Length + columns - 1) / columns) * 224;
         var canvas = new byte[width * height * 4];
         for (var i = 0; i < width * height; i++)
         {
@@ -63,8 +69,8 @@ internal static class ControlArtTests
         {
             var art = ControlButtonArt.Render(icons[i], 28, 28);
             var sourceWidth = 28 * ControlButtonArt.Resolution;
-            Blit(art, sourceWidth, 24 + i * 128, 16, sourceWidth);
-            Blit(art, sourceWidth, 66 + i * 128, 164, 28);
+            Blit(art, sourceWidth, 24 + i % columns * 128, 16 + i / columns * 224, sourceWidth);
+            Blit(art, sourceWidth, 66 + i % columns * 128, 164 + i / columns * 224, 28);
         }
         WritePng(path, width, height, canvas);
 
