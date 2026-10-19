@@ -1,3 +1,8 @@
 analysis/raw/
 analysis/decompiled/
 .scratch/
+vendor/
+artifacts/
+**/bin/
+**/obj/
+*.user
