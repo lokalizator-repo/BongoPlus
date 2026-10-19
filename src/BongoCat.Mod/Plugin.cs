@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
 using BepInEx;
 using BongoCat;
@@ -13,7 +15,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.1.4";
+    public const string Version = "0.1.5";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -38,7 +40,7 @@ public sealed class Plugin : BaseUnityPlugin
 
             Balance = new BalanceService(Logger);
             Automation = new AutomationService(Logger, Balance);
-            Cosmetics = new CosmeticService();
+            Cosmetics = new CosmeticService(Logger);
             _harmony = new Harmony(Id);
             _harmony.PatchAll(typeof(Plugin).Assembly);
             Logger.LogInfo("Bongo Cat Mods " + Version + " loaded. Build verified; all automation starts off.");
@@ -103,9 +105,17 @@ public sealed class Plugin : BaseUnityPlugin
         private static void Postfix(ShopItem __instance, int itemId) => Instance?.Automation?.OnPurchaseFinished(__instance, itemId);
     }
 
-    [HarmonyPatch(typeof(CatCosmetics), nameof(CatCosmetics.Validate))]
+    [HarmonyPatch]
     private static class RefreshAppearance
     {
+        private static IEnumerable<MethodBase> TargetMethods()
+        {
+            foreach (var name in new[] { nameof(CatCosmetics.Validate), nameof(CatCosmetics.EquipItem),
+                nameof(CatCosmetics.RestoreActuallyEquippedItems), "OnLobbyEnter" })
+                yield return AccessTools.Method(typeof(CatCosmetics), name)
+                    ?? throw new MissingMethodException(typeof(CatCosmetics).FullName, name);
+        }
+
         private static void Postfix() => Instance?.Cosmetics?.Apply(true);
     }
 

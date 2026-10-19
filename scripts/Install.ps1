@@ -43,6 +43,6 @@ if ($loaderConfigText -match '(?m)^UnityLogListening\s*=') {
 }
 [IO.File]::WriteAllText($loaderConfig, $loaderConfigText, [Text.UTF8Encoding]::new($false))
 New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
-[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = '0.1.4'; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
+[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = '0.1.5'; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $marker -Encoding utf8
 Write-Output 'Installed. Launch Bongo Cat normally through Steam, then press F9.'

@@ -225,12 +225,8 @@ internal sealed class ModWindow : MonoBehaviour
 
     private void Cosmetics()
     {
-        ToggleRow("Share standard appearance in lobby", () => _plugin.Cosmetics.Publish, value =>
-        {
-            _plugin.Cosmetics.Publish = value;
-            if (!value) _plugin.Cosmetics.RestorePublished();
-            _plugin.Cosmetics.Apply();
-        });
+        ToggleRow("Share standard appearance in lobby", () => _plugin.Cosmetics.Publish,
+            value => _plugin.Cosmetics.SetPublish(value));
         var slots = NativeStyle.Row(_body);
         foreach (var slot in new[] { "skin", "hat", "bongos" })
         {
