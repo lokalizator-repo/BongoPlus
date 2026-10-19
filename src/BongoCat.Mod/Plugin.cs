@@ -9,11 +9,12 @@ using UnityEngine;
 
 namespace BongoCatMod;
 
-[BepInPlugin(Id, "Bongo Cat Mods", "0.1.0")]
+[BepInPlugin(Id, "Bongo Cat Mods", Version)]
 [BepInProcess("BongoCat.exe")]
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
+    public const string Version = "0.1.1";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -44,7 +45,7 @@ public sealed class Plugin : BaseUnityPlugin
             Cosmetics = new CosmeticService();
             _harmony = new Harmony(Id);
             _harmony.PatchAll(typeof(Plugin).Assembly);
-            Logger.LogInfo("Bongo Cat Mods 0.1.0 loaded. Build verified; all automation starts off.");
+            Logger.LogInfo("Bongo Cat Mods " + Version + " loaded. Build verified; all automation starts off.");
         }
         catch (Exception error)
         {

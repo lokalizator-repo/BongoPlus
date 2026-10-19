@@ -23,6 +23,7 @@ $records = [System.Collections.Generic.List[object]]::new()
 foreach ($file in Get-ChildItem -LiteralPath $package -File -Recurse) {
     $relative = $file.FullName.Substring($package.Length + 1)
     $target = [IO.Path]::GetFullPath((Join-Path $game $relative))
+    if ($relative.Replace('\', '/') -eq 'BepInEx/config/BepInEx.cfg' -and (Test-Path -LiteralPath $target)) { continue }
     if (-not $target.StartsWith($game + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Package file escapes the game directory.'
     }
@@ -31,7 +32,17 @@ foreach ($file in Get-ChildItem -LiteralPath $package -File -Recurse) {
     Copy-Item -LiteralPath $file.FullName -Destination $target -Force
     $records.Add([pscustomobject]@{ path = $relative; sha256 = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() })
 }
+$loaderConfig = Join-Path $game 'BepInEx/config/BepInEx.cfg'
+$loaderConfigText = [IO.File]::ReadAllText($loaderConfig)
+if ($loaderConfigText -match '(?m)^UnityLogListening\s*=') {
+    $loaderConfigText = $loaderConfigText -replace '(?m)^UnityLogListening\s*=.*$', 'UnityLogListening = false'
+} elseif ($loaderConfigText -match '(?m)^\[Logging\]\s*$') {
+    $loaderConfigText = $loaderConfigText -replace '(?m)^\[Logging\]\s*$', "[Logging]`nUnityLogListening = false"
+} else {
+    $loaderConfigText += "`n[Logging]`nUnityLogListening = false`n"
+}
+[IO.File]::WriteAllText($loaderConfig, $loaderConfigText, [Text.UTF8Encoding]::new($false))
 New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
-[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = '0.1.0'; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
+[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = '0.1.1'; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $marker -Encoding utf8
 Write-Output 'Installed. Launch Bongo Cat normally through Steam, then press F8.'

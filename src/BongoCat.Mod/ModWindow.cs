@@ -90,6 +90,7 @@ internal sealed class ModWindow : MonoBehaviour
         _body.anchorMin = new Vector2(0, 1);
         _body.anchorMax = Vector2.one;
         _body.pivot = new Vector2(0.5f, 1);
+        _body.sizeDelta = Vector2.zero;
         NativeStyle.Vertical(_body);
         _body.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         var scroll = viewport.gameObject.AddComponent<ScrollRect>();
@@ -99,7 +100,7 @@ internal sealed class ModWindow : MonoBehaviour
         scroll.movementType = ScrollRect.MovementType.Clamped;
         scroll.scrollSensitivity = 25;
 
-        _status = NativeStyle.Text(_panel, "F8 to toggle • v0.1.0", 12);
+        _status = NativeStyle.Text(_panel, "F8 to toggle • v" + Plugin.Version, 12);
         _status.rectTransform.anchorMin = Vector2.zero;
         _status.rectTransform.anchorMax = new Vector2(1, 0);
         NativeStyle.Offsets(_status.rectTransform, new Vector2(18, 10), new Vector2(-18, 48));
