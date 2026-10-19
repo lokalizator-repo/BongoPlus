@@ -1,15 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using BepInEx.Logging;
 using BongoCat;
+using BongoCat.Multiplayer;
 using Heathen.SteamworksIntegration;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace BongoCatMod;
 
 internal sealed class CosmeticService
 {
+    private static readonly FieldInfo[] BongoImages = {
+        GameAccess.RequiredField(typeof(Cat), "_bongosLeftBackImage"),
+        GameAccess.RequiredField(typeof(Cat), "_bongosLeftFrontImage"),
+        GameAccess.RequiredField(typeof(Cat), "_bongosRightImage")
+    };
     private readonly Dictionary<string, int> _selected = new Dictionary<string, int>();
     private readonly ManualLogSource _log;
     private readonly ModSettings _settings;
@@ -18,6 +26,7 @@ internal sealed class CosmeticService
     private bool _dirty;
     public bool Publish { get; private set; } = true;
     public string Status { get; private set; } = "Using your normal equipped cosmetics.";
+    public string EmoteStatus { get; private set; } = "Click an emote to send it.";
 
     public CosmeticService(ManualLogSource log, ModSettings settings)
     {
@@ -50,6 +59,20 @@ internal sealed class CosmeticService
         _settings.Save();
         _dirty = true;
         Apply();
+        if (item.IsBongos) LogBongos(item);
+    }
+
+    public void SendEmote(SteamItemRuntime item)
+    {
+        if (!item.IsEmote) throw new ArgumentException("Choose a standard emote.", nameof(item));
+        if (!Cat.Instance || !Cat.Instance.emoteSpawner || !Cat.Instance.emoteSpawner.gameObject.activeInHierarchy)
+            throw new InvalidOperationException("Wait for your cat to load.");
+        Cat.Instance.emoteSpawner.SpawnEmoteParticle(item);
+        SteamMultiplayer.SendEmote(item);
+        var inLobby = LobbyData.Current.IsValid;
+        EmoteStatus = item.ItemName + (inLobby ? " — sent to lobby." : " — local emote; join a lobby to share.");
+        _log.LogInfo("Emote requested: item=" + item.Id + ", lobby=" +
+            (inLobby ? LobbyData.Current.SteamId.ToString() : "none") + ".");
     }
 
     public bool Selected(SteamItemRuntime item) => _selected.TryGetValue(item.ItemSlot, out var id) && id == item.Id;
@@ -89,7 +112,11 @@ internal sealed class CosmeticService
         var synchronized = Publish && lobby.IsValid;
         foreach (var pair in _selected)
         {
-            if (_dirty || force) Cat.Instance.SetItem(SteamItemIdReference.Inst[pair.Value], false);
+            if (_dirty || force)
+            {
+                var item = SteamItemIdReference.Inst[pair.Value];
+                Cat.Instance.SetItem(item, item.IsBongos);
+            }
             if (Publish && lobby.IsValid)
             {
                 var me = lobby.Me;
@@ -103,6 +130,8 @@ internal sealed class CosmeticService
                 }
             }
         }
+        if ((_dirty || force) && OnDemandRenderHelper.Instance)
+            OnDemandRenderHelper.Instance.ResumeRenderingForDuration(0.2f);
         _dirty = false;
         SetStatus(!Publish ? "Local appearance only. Lobby sharing is off."
             : !lobby.IsValid ? "Appearance selected. Join a lobby to share it."
@@ -139,5 +168,17 @@ internal sealed class CosmeticService
         if (Status == value) return;
         Status = value;
         _log.LogInfo("Cosmetics: " + value);
+    }
+
+    private void LogBongos(SteamItemRuntime item)
+    {
+        foreach (var field in BongoImages)
+        {
+            var image = (Image)field.GetValue(Cat.Instance);
+            _log.LogInfo("Bongos applied: item=" + item.Id + ", image=" + field.Name +
+                ", sprite=" + (image.sprite ? image.sprite.name : "none") +
+                ", enabled=" + image.enabled + ", active=" + image.gameObject.activeInHierarchy +
+                ", scale=" + image.transform.localScale + ", alpha=" + image.color.a + ".");
+        }
     }
 }

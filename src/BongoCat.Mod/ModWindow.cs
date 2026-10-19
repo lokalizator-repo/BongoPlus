@@ -25,6 +25,7 @@ internal sealed class ModWindow : MonoBehaviour
     private RectTransform _grid = null!;
     private TextMeshProUGUI _pageLabel = null!;
     private TMP_InputField _search = null!;
+    private TextMeshProUGUI _catalogHint = null!;
     private Button _menuButton = null!;
     private string _slot = "skin";
     private int _page;
@@ -147,7 +148,9 @@ internal sealed class ModWindow : MonoBehaviour
         if (_applyBalance) _applyBalance.interactable = GameAccess.Ready && !_plugin.Balance.Pending;
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
-        _status.text = _error ?? (_tab == 2 ? _plugin.Cosmetics.Status : _plugin.Automation.Status);
+        _status.text = _error ?? (_tab == 2
+            ? (_slot == "emote" ? _plugin.Cosmetics.EmoteStatus : _plugin.Cosmetics.Status)
+            : _plugin.Automation.Status);
     }
 
     public void Toggle() => SetVisible(!_panel.gameObject.activeSelf);
@@ -244,10 +247,10 @@ internal sealed class ModWindow : MonoBehaviour
         ToggleRow("Share standard appearance in lobby", () => _plugin.Cosmetics.Publish,
             value => _plugin.Cosmetics.SetPublish(value), false);
         var slots = NativeStyle.Row(_body);
-        foreach (var slot in new[] { "skin", "hat", "bongos" })
+        foreach (var slot in new[] { "skin", "hat", "bongos", "emote" })
         {
             var selectedSlot = slot;
-            NativeStyle.Button(slots, CultureInfo.InvariantCulture.TextInfo.ToTitleCase(slot), () =>
+            NativeStyle.Button(slots, slot == "emote" ? "Emotes" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(slot), () =>
             {
                 _slot = selectedSlot;
                 _page = 0;
@@ -256,6 +259,8 @@ internal sealed class ModWindow : MonoBehaviour
         }
         _search = NativeStyle.Input(_body, "", "Search cosmetics");
         _search.onValueChanged.AddListener(_ => { _page = 0; FillGrid(); });
+        _catalogHint = NativeStyle.Label(_body, "", 32, 12);
+        _catalogHint.textWrappingMode = TextWrappingModes.Normal;
         _grid = NativeStyle.Rect("Cosmetic grid", _body);
         var grid = _grid.gameObject.AddComponent<GridLayoutGroup>();
         grid.cellSize = new Vector2(87, 88);
@@ -277,6 +282,9 @@ internal sealed class ModWindow : MonoBehaviour
     private void FillGrid()
     {
         if (!_grid) return;
+        _catalogHint.text = _slot == "emote" ? "Click a standard emote to send it to your current lobby."
+            : _slot == "bongos" ? "Bongos are the instruments in front of your cat's paws."
+            : "Click an item to apply and save your appearance.";
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
         var items = _plugin.Cosmetics.Items(_slot, _search ? _search.text : "").ToList();
         var pages = Math.Max(1, (items.Count + 11) / 12);
@@ -285,7 +293,11 @@ internal sealed class ModWindow : MonoBehaviour
         foreach (var item in items.Skip(_page * 12).Take(12))
         {
             var cosmetic = item;
-            var card = NativeStyle.Button(_grid, "", () => _plugin.Run(() => _plugin.Cosmetics.Select(cosmetic)));
+            var card = NativeStyle.Button(_grid, "", () => _plugin.Run(() =>
+            {
+                if (cosmetic.IsEmote) _plugin.Cosmetics.SendEmote(cosmetic);
+                else _plugin.Cosmetics.Select(cosmetic);
+            }));
             var imageRect = NativeStyle.Rect("Icon", card.transform);
             imageRect.anchorMin = new Vector2(0, 0.26f);
             imageRect.anchorMax = Vector2.one;
