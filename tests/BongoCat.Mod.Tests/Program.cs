@@ -43,16 +43,16 @@ for (var i = 0; i < 5000; i++)
 }
 Check(allPlansValid, "5000 balance plans satisfy Steam monotonicity and change at most one counter");
 
-var policy = new AutomationPolicy { Limit = 1000 };
+var policy = new AutomationPolicy();
 Check(!policy.Observe("friend:skin", true, 0), "A newly observed ready chest waits for stable state");
 Check(policy.Observe("friend:skin", true, 2), "A stable ready chest can receive one gift");
-policy.Record("friend:skin", 500);
+policy.Record("friend:skin");
 Check(!policy.Observe("friend:skin", true, 10), "Repeated ready events cannot duplicate a gift");
 policy.Observe("friend:skin", false, 11);
 Check(!policy.Observe("friend:skin", true, 12) && policy.Observe("friend:skin", true, 14), "A new chest cycle becomes eligible");
-Check(policy.CanSpend(500) && !policy.CanSpend(501) && !policy.CanSpend(0), "Spending respects the remaining budget");
-policy.Record("self", 500);
-Check(!policy.CanSpend(1), "Budget exhaustion stops subsequent spending");
+policy.Observe("other:skin", true, 12);
+Check(policy.Observe("other:skin", true, 14), "A gift to one player cannot block a different recipient");
+policy.Record("friend:skin");
 policy.NewLobby();
-Check(policy.Spent == 1000 && !policy.CanSpend(1), "Changing lobbies cannot reset the spending budget");
+Check(!policy.Observe("friend:skin", true, 20) && policy.Observe("friend:skin", true, 22), "A new lobby requires a fresh stable observation");
 Console.WriteLine($"{passed} checks passed.");

@@ -133,7 +133,7 @@ internal sealed class ModWindow : MonoBehaviour
         if (!_panel.gameObject.activeSelf || Time.realtimeSinceStartup < _nextRefresh) return;
         _nextRefresh = Time.realtimeSinceStartup + 0.5f;
         if (_balance) _balance.text = "Available points: " + GameAccess.Balance.ToString("N0", CultureInfo.InvariantCulture);
-        if (_detail) _detail.text = _plugin.Balance.Status + "\nSession spent: " + _plugin.Automation.Spent.ToString("N0") + " / " + _plugin.Automation.Limit.ToString("N0") +
+        if (_detail) _detail.text = _plugin.Balance.Status +
             "\nMax balance: " + Math.Max(0, BalanceMath.Maximum - (int)GameAccess.Spent.GetValue(Pets.Instance)).ToString("N0");
         if (_applyBalance) _applyBalance.interactable = GameAccess.Ready && !_plugin.Balance.Pending;
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
@@ -194,15 +194,6 @@ internal sealed class ModWindow : MonoBehaviour
         _detail = NativeStyle.Label(_body, "", 54, 12);
         _detail.textWrappingMode = TextWrappingModes.Normal;
         NativeStyle.Label(_body, "CHEST AUTOMATION", 25, 17);
-        var budget = NativeStyle.Row(_body);
-        var limit = NativeStyle.Input(budget, _plugin.Automation.Limit.ToString(), "Session spend limit");
-        limit.contentType = TMP_InputField.ContentType.IntegerNumber;
-        NativeStyle.Button(budget, "Set limit", () => _plugin.Run(() =>
-        {
-            if (!int.TryParse(limit.text, out var value) || value < _plugin.Automation.Spent)
-                throw new ArgumentException("Limit must be at least the amount already spent.");
-            _plugin.Automation.Limit = value;
-        }), 94);
         ToggleRow("Buy my ready chests", () => _plugin.Automation.BuyOwn, v => _plugin.Automation.BuyOwn = v);
         ToggleRow("Cosmetic chests", () => _plugin.Automation.Cosmetics, v => _plugin.Automation.Cosmetics = v);
         ToggleRow("Emote chests", () => _plugin.Automation.Emotes, v => _plugin.Automation.Emotes = v);
@@ -227,7 +218,7 @@ internal sealed class ModWindow : MonoBehaviour
                 else _plugin.Automation.SelectedPlayers.Remove(id);
             });
         }
-        NativeStyle.Label(_body, "The spending limit and chest types are in General.", 42, 13).textWrappingMode = TextWrappingModes.Normal;
+        NativeStyle.Label(_body, "Choose chest types in General.", 30, 13);
         NativeStyle.Button(_body, "Stop all automation", () => _plugin.Automation.Stop());
     }
 
