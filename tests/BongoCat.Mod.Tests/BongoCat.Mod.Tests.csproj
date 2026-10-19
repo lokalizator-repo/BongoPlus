@@ -9,6 +9,7 @@
     <Compile Include="../../src/BongoCat.Mod/BalanceMath.cs" Link="BalanceMath.cs" />
     <Compile Include="../../src/BongoCat.Mod/AutomationPolicy.cs" Link="AutomationPolicy.cs" />
     <Compile Include="../../src/BongoCat.Mod/ModSettings.cs" Link="ModSettings.cs" />
+    <Compile Include="../../src/BongoCat.Mod/WheelLayout.cs" Link="WheelLayout.cs" />
     <Reference Include="BepInEx"><HintPath>../../vendor/BepInEx-5.4.23.5/BepInEx/core/BepInEx.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

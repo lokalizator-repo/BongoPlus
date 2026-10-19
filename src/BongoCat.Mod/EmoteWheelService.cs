@@ -28,7 +28,13 @@ internal sealed class EmoteWheelService
         _pinned = settings.ReadWheelEmotes();
     }
 
-    public void OnReady(EmoteDonut wheel) => _readyWheel = wheel;
+    public void OnReady(EmoteDonut wheel)
+    {
+        _readyWheel = wheel;
+        Capacity.SetValue(wheel, int.MaxValue);
+        var pager = wheel.GetComponent<WheelPager>() ?? wheel.gameObject.AddComponent<WheelPager>();
+        pager.Initialize(wheel);
+    }
     public void BeginValidation() => _validationDepth++;
     public void EndValidation() => _validationDepth = Math.Max(0, _validationDepth - 1);
     public bool KeepDuringValidation(SteamItemRuntime item) =>
@@ -56,8 +62,6 @@ internal sealed class EmoteWheelService
             Status = item.ItemName + " — removed from wheel.";
             return;
         }
-        if (GetEntries(wheel).Count >= (int)Capacity.GetValue(wheel))
-            throw new InvalidOperationException("Your emote wheel is full. Remove an emote first.");
 
         var added = _pinned.Add(item.Id);
         try
@@ -86,11 +90,6 @@ internal sealed class EmoteWheelService
             if (Contains(wheel, id)) continue;
             var item = CatInventory.Instance.Items.FirstOrDefault(i => i.Id == id && i.IsEmote);
             if (item == null || !item.Icon) continue;
-            if (GetEntries(wheel).Count >= (int)Capacity.GetValue(wheel))
-            {
-                Status = "Wheel full. Remove an emote to restore saved choices.";
-                break;
-            }
             wheel.ToggleItem(item);
             _log.LogInfo("Native wheel emote restored: item=" + id + ".");
         }

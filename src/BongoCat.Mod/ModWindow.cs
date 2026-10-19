@@ -26,14 +26,13 @@ internal sealed class ModWindow : MonoBehaviour
     private TextMeshProUGUI _pageLabel = null!;
     private TMP_InputField _search = null!;
     private TextMeshProUGUI _catalogHint = null!;
-    private RectTransform _wheelControls = null!;
-    private bool _editWheel;
     private Button _menuButton = null!;
     private string _slot = "skin";
     private int _page;
     private int _tab;
     private float _nextRefresh;
     private string? _error;
+    private string? _emoteFeedback;
     private BongoCat.OnDemandRenderHelper _renderOwner = null!;
     private bool _ownsRenderDemand;
 
@@ -151,7 +150,7 @@ internal sealed class ModWindow : MonoBehaviour
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
         _status.text = _error ?? (_tab == 2
-            ? (_slot == "emote" ? (_editWheel ? _plugin.Wheel.Status : _plugin.Cosmetics.EmoteStatus) : _plugin.Cosmetics.Status)
+            ? (_slot == "emote" ? _emoteFeedback ?? _plugin.Cosmetics.EmoteStatus : _plugin.Cosmetics.Status)
             : _plugin.Automation.Status);
     }
 
@@ -264,9 +263,6 @@ internal sealed class ModWindow : MonoBehaviour
         _search.onValueChanged.AddListener(_ => { _page = 0; FillGrid(); });
         _catalogHint = NativeStyle.Label(_body, "", 32, 12);
         _catalogHint.textWrappingMode = TextWrappingModes.Normal;
-        _wheelControls = NativeStyle.Row(_body);
-        NativeStyle.Button(_wheelControls, "Send on click", () => { _editWheel = false; _error = null; FillGrid(); });
-        NativeStyle.Button(_wheelControls, "Add/remove on click", () => { _editWheel = true; _error = null; FillGrid(); });
         _grid = NativeStyle.Rect("Cosmetic grid", _body);
         var grid = _grid.gameObject.AddComponent<GridLayoutGroup>();
         grid.cellSize = new Vector2(87, 88);
@@ -288,10 +284,8 @@ internal sealed class ModWindow : MonoBehaviour
     private void FillGrid()
     {
         if (!_grid) return;
-        _wheelControls.gameObject.SetActive(_slot == "emote");
         _catalogHint.text = _slot == "emote"
-            ? (_editWheel ? "Click to add/remove an emote. [Wheel] marks current wheel entries."
-                : "Click to send an emote. Switch to Add/remove to edit your wheel.")
+            ? "Click an emote to send. Use + / - to add or remove it from your wheel."
             : _slot == "bongos" ? "Bongos are the instruments in front of your cat's paws."
             : "Click an item to apply and save your appearance.";
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
@@ -305,12 +299,11 @@ internal sealed class ModWindow : MonoBehaviour
             var card = NativeStyle.Button(_grid, "", () => _plugin.Run(() =>
             {
                 _error = null;
-                if (cosmetic.IsEmote && _editWheel)
+                if (cosmetic.IsEmote)
                 {
-                    _plugin.Wheel.Toggle(cosmetic);
-                    FillGrid();
+                    _plugin.Cosmetics.SendEmote(cosmetic);
+                    _emoteFeedback = _plugin.Cosmetics.EmoteStatus;
                 }
-                else if (cosmetic.IsEmote) _plugin.Cosmetics.SendEmote(cosmetic);
                 else _plugin.Cosmetics.Select(cosmetic);
             }));
             var imageRect = NativeStyle.Rect("Icon", card.transform);
@@ -325,6 +318,22 @@ internal sealed class ModWindow : MonoBehaviour
             label.text = (cosmetic.IsEmote && _plugin.Wheel.Contains(cosmetic.Id) ? "[Wheel] " : "") + cosmetic.ItemName;
             label.fontSize = 10;
             label.rectTransform.anchorMax = new Vector2(1, 0.25f);
+            if (cosmetic.IsEmote)
+            {
+                var toggle = NativeStyle.Button(card.transform, _plugin.Wheel.Contains(cosmetic.Id) ? "-" : "+",
+                    () => _plugin.Run(() =>
+                    {
+                        _error = null;
+                        _plugin.Wheel.Toggle(cosmetic);
+                        _emoteFeedback = _plugin.Wheel.Status;
+                        FillGrid();
+                    }));
+                var rect = (RectTransform)toggle.transform;
+                rect.anchorMin = rect.anchorMax = Vector2.one;
+                rect.pivot = Vector2.one;
+                rect.sizeDelta = new Vector2(26, 24);
+                rect.anchoredPosition = new Vector2(-3, -3);
+            }
         }
     }
 

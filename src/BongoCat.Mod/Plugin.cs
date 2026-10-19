@@ -16,7 +16,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.1.8";
+    public const string Version = "0.1.9";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -158,6 +158,49 @@ public sealed class Plugin : BaseUnityPlugin
             Instance?.Wheel?.EndValidation();
             return __exception;
         }
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), "RearrangeEmotes")]
+    private static class WheelRearranged
+    {
+        private static bool Prefix(EmoteDonut __instance)
+        {
+            var pager = __instance.GetComponent<WheelPager>();
+            if (!pager) return true;
+            pager.Refresh();
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), "Open")]
+    private static class WheelOpened
+    {
+        private static bool Prefix(EmoteDonut __instance)
+        {
+            var pager = __instance.GetComponent<WheelPager>();
+            if (!pager) return true;
+            pager.Open();
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), "Close")]
+    private static class WheelClosed
+    {
+        private static bool Prefix(EmoteDonut __instance)
+        {
+            var pager = __instance.GetComponent<WheelPager>();
+            if (!pager) return true;
+            pager.Close();
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), "Update")]
+    private static class WheelHovered
+    {
+        private static bool Prefix(EmoteDonut __instance) =>
+            !(__instance.GetComponent<WheelPager>()?.KeepOpenOnHover() ?? false);
     }
 
     [HarmonyPatch(typeof(EmoteDonut), "RemoveEmote")]
