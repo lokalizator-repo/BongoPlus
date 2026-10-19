@@ -76,16 +76,16 @@ internal sealed class CosmeticService
     public void Tick()
     {
         if (Time.realtimeSinceStartup < _nextRefresh) return;
-        _nextRefresh = Time.realtimeSinceStartup + 2f;
+        _nextRefresh = Time.realtimeSinceStartup + (_restorePending ? 0.1f : 2f);
         Apply();
     }
 
     public void Apply(bool force = false)
     {
-        if (!Cat.Instance || !SteamItemIdReference.Inst) return;
+        if (!Cat.Instance || !SteamItemIdReference.Inst || !MemoryImageCache.Instance) return;
+        var restoredNow = false;
         if (_restorePending)
         {
-            if (!CatInventory.Instance || !CatInventory.Instance.IsInitialized) return;
             foreach (var entry in _settings.Appearance.Values)
                 if (SteamItemIdReference.Inst.Ids.Contains(entry.Value) && !SteamItemIdReference.Inst[entry.Value].Icon)
                     return;
@@ -102,6 +102,7 @@ internal sealed class CosmeticService
             }
             _restorePending = false;
             _dirty = true;
+            restoredNow = true;
         }
         if (_selected.Count == 0) return;
         var lobby = LobbyData.Current;
@@ -128,6 +129,9 @@ internal sealed class CosmeticService
         }
         if ((_dirty || force) && OnDemandRenderHelper.Instance)
             OnDemandRenderHelper.Instance.ResumeRenderingForDuration(0.2f);
+        if (restoredNow)
+            _log.LogInfo("Saved appearance restored from local assets at " +
+                Time.realtimeSinceStartup.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "s.");
         _dirty = false;
         SetStatus(!Publish ? "Local appearance only. Lobby sharing is off."
             : !lobby.IsValid ? "Appearance selected. Join a lobby to share it."
