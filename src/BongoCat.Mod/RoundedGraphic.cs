@@ -5,14 +5,21 @@ using UnityEngine.UI;
 
 namespace BongoCatMod;
 
-internal sealed class ControlButtonGraphic : MaskableGraphic
+internal sealed class RoundedGraphic : MaskableGraphic
 {
     private static readonly Dictionary<string, Texture2D> Textures = new Dictionary<string, Texture2D>();
-    private ControlIcon _icon;
+    private ControlIcon? _icon;
 
     public void Initialize(ControlIcon icon)
     {
         _icon = icon;
+        SetAllDirty();
+    }
+
+    public void InitializeSelection()
+    {
+        _icon = null;
+        raycastTarget = false;
         SetAllDirty();
     }
 
@@ -23,9 +30,10 @@ internal sealed class ControlButtonGraphic : MaskableGraphic
             var rect = rectTransform.rect;
             var width = Math.Max(8, Math.Min(128, (int)Math.Round(rect.width)));
             var height = Math.Max(8, Math.Min(128, (int)Math.Round(rect.height)));
-            var key = _icon + ":" + width + ":" + height;
+            var key = (_icon?.ToString() ?? "selection") + ":" + width + ":" + height;
             if (Textures.TryGetValue(key, out var texture)) return texture;
-            var bytes = ControlButtonArt.Render(_icon, width, height);
+            var bytes = _icon.HasValue ? ControlButtonArt.Render(_icon.Value, width, height)
+                : ControlButtonArt.RenderSelection(width, height);
             var pixels = new Color[bytes.Length / 4];
             for (var i = 0; i < pixels.Length; i++)
             {

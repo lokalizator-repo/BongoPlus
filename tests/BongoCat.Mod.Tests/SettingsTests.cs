@@ -10,7 +10,12 @@ internal static class SettingsTests
         try
         {
             var path = Path.Combine(directory, "settings.cfg");
+            var legacy = new ConfigFile(path, false);
+            legacy.Bind("Appearance", "bongos", 1319);
+            legacy.Save();
             var settings = new ModSettings(new ConfigFile(path, false));
+            check(!settings.Appearance.ContainsKey("bongos") && !File.ReadAllText(path).Contains("bongos"),
+                "The removed Bongos setting is migrated out of older config files");
             check(!settings.BuyOwn.Value && !settings.Gift.Value && settings.ShareAppearance.Value,
                 "Fresh settings keep automation off and lobby appearance sharing on");
             settings.BuyOwn.Value = true;

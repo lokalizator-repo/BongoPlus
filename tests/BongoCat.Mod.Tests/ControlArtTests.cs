@@ -38,6 +38,12 @@ internal static class ControlArtTests
         }
         check(mirrored, "Previous and next arrow artwork is exactly mirrored");
         check(stroke, "Add artwork includes a vertical stroke absent from remove artwork");
+        var frame = ControlButtonArt.RenderSelection(87, 88);
+        var frameWidth = 87 * ControlButtonArt.Resolution;
+        var frameHeight = 88 * ControlButtonArt.Resolution;
+        check(frame[3] == 0 && frame[((frameHeight / 2) * frameWidth + frameWidth / 2) * 4 + 3] == 0 &&
+            frame[((frameHeight / 2) * frameWidth + 6) * 4 + 3] == 255,
+            "Selection frame has a rounded contour and keeps the cosmetic preview transparent");
     }
 
     internal static void ExportPreview(string path)

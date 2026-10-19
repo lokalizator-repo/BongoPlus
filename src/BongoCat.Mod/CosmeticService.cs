@@ -1,23 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using BepInEx.Logging;
 using BongoCat;
 using BongoCat.Multiplayer;
 using Heathen.SteamworksIntegration;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace BongoCatMod;
 
 internal sealed class CosmeticService
 {
-    private static readonly FieldInfo[] BongoImages = {
-        GameAccess.RequiredField(typeof(Cat), "_bongosLeftBackImage"),
-        GameAccess.RequiredField(typeof(Cat), "_bongosLeftFrontImage"),
-        GameAccess.RequiredField(typeof(Cat), "_bongosRightImage")
-    };
     private readonly Dictionary<string, int> _selected = new Dictionary<string, int>();
     private readonly ManualLogSource _log;
     private readonly ModSettings _settings;
@@ -54,12 +47,13 @@ internal sealed class CosmeticService
     public void Select(SteamItemRuntime item)
     {
         if (!Cat.Instance) throw new InvalidOperationException("Wait for your cat to load.");
+        if (!_settings.Appearance.ContainsKey(item.ItemSlot))
+            throw new ArgumentException("Choose a skin or hat.", nameof(item));
         _selected[item.ItemSlot] = item.Id;
         _settings.Appearance[item.ItemSlot].Value = item.Id;
         _settings.Save();
         _dirty = true;
         Apply();
-        if (item.IsBongos) LogBongos(item);
     }
 
     public void SendEmote(SteamItemRuntime item)
@@ -75,7 +69,9 @@ internal sealed class CosmeticService
             (inLobby ? LobbyData.Current.SteamId.ToString() : "none") + ".");
     }
 
-    public bool Selected(SteamItemRuntime item) => _selected.TryGetValue(item.ItemSlot, out var id) && id == item.Id;
+    public bool Selected(SteamItemRuntime item) => _selected.TryGetValue(item.ItemSlot, out var id)
+        ? id == item.Id
+        : CatCosmetics.Instance && CatCosmetics.Instance.EquippedItems.Any(equipped => equipped.Id == item.Id);
 
     public void Tick()
     {
@@ -115,7 +111,7 @@ internal sealed class CosmeticService
             if (_dirty || force)
             {
                 var item = SteamItemIdReference.Inst[pair.Value];
-                Cat.Instance.SetItem(item, item.IsBongos);
+                Cat.Instance.SetItem(item, false);
             }
             if (Publish && lobby.IsValid)
             {
@@ -147,15 +143,16 @@ internal sealed class CosmeticService
         foreach (var entry in _settings.Appearance.Values) entry.Value = -1;
         _settings.Save();
         RestorePublished();
-        foreach (var slot in ItemSlots.Cosmetics) Cat.Instance.ClearItemSlot(slot);
-        foreach (var item in CatCosmetics.Instance.EquippedItems) Cat.Instance.SetItem(item, false);
+        foreach (var slot in _settings.Appearance.Keys) Cat.Instance.ClearItemSlot(slot);
+        foreach (var item in CatCosmetics.Instance.EquippedItems.Where(i => _settings.Appearance.ContainsKey(i.ItemSlot)))
+            Cat.Instance.SetItem(item, false);
         SetStatus("Restored your normal equipped cosmetics.");
     }
 
     public void RestorePublished()
     {
         if (!LobbyData.Current.IsValid || !CatCosmetics.Instance) return;
-        foreach (var slot in ItemSlots.Cosmetics)
+        foreach (var slot in _settings.Appearance.Keys)
         {
             var item = CatCosmetics.Instance.EquippedItems.FirstOrDefault(i => i.ItemSlot == slot);
             var me = LobbyData.Current.Me;
@@ -170,15 +167,4 @@ internal sealed class CosmeticService
         _log.LogInfo("Cosmetics: " + value);
     }
 
-    private void LogBongos(SteamItemRuntime item)
-    {
-        foreach (var field in BongoImages)
-        {
-            var image = (Image)field.GetValue(Cat.Instance);
-            _log.LogInfo("Bongos applied: item=" + item.Id + ", image=" + field.Name +
-                ", sprite=" + (image.sprite ? image.sprite.name : "none") +
-                ", enabled=" + image.enabled + ", active=" + image.gameObject.activeInHierarchy +
-                ", scale=" + image.transform.localScale + ", alpha=" + image.color.a + ".");
-        }
-    }
 }

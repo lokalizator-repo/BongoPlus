@@ -30,8 +30,11 @@ internal sealed class ModSettings
         Recipients = config.Bind("Automation", "Recipients", "");
         ShareAppearance = config.Bind("Appearance", "ShareInLobby", true);
         WheelEmotes = config.Bind("Emotes", "WheelItems", "");
-        foreach (var slot in new[] { "skin", "hat", "bongos" })
+        foreach (var slot in new[] { "skin", "hat" })
             Appearance.Add(slot, config.Bind("Appearance", slot, -1));
+        var obsolete = config.Bind("Appearance", "bongos", -1);
+        config.Remove(obsolete.Definition);
+        config.Save();
     }
 
     public HashSet<ulong> ReadRecipients()

@@ -66,7 +66,7 @@ internal static class NativeStyle
     {
         var rect = Rect(icon.ToString(), parent);
         rect.sizeDelta = new Vector2(28, 28);
-        var graphic = rect.gameObject.AddComponent<ControlButtonGraphic>();
+        var graphic = rect.gameObject.AddComponent<RoundedGraphic>();
         graphic.Initialize(icon);
         var button = rect.gameObject.AddComponent<Button>();
         button.targetGraphic = graphic;

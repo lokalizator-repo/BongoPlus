@@ -160,7 +160,7 @@ internal sealed class ModWindow : MonoBehaviour
     {
         if (!_panel || _panel.gameObject.activeSelf == show) return;
         _panel.gameObject.SetActive(show);
-        if (show && _tab == 2 && _slot == "emote") FillGrid();
+        if (show && _tab == 2) FillGrid();
         _renderOwner = OnDemandRenderHelper.Instance;
         if (_renderOwner)
         {
@@ -249,7 +249,7 @@ internal sealed class ModWindow : MonoBehaviour
         ToggleRow("Share standard appearance in lobby", () => _plugin.Cosmetics.Publish,
             value => _plugin.Cosmetics.SetPublish(value), false);
         var slots = NativeStyle.Row(_body);
-        foreach (var slot in new[] { "skin", "hat", "bongos", "emote" })
+        foreach (var slot in new[] { "skin", "hat", "emote" })
         {
             var selectedSlot = slot;
             NativeStyle.Button(slots, slot == "emote" ? "Emotes" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(slot), () =>
@@ -276,7 +276,11 @@ internal sealed class ModWindow : MonoBehaviour
         _pageLabel.alignment = TextAlignmentOptions.Center;
         _pageLabel.gameObject.AddComponent<LayoutElement>().preferredWidth = 80;
         NativeStyle.Button(pages, "Next", () => { _page++; FillGrid(); });
-        NativeStyle.Button(_body, "Restore equipped appearance", () => _plugin.Run(_plugin.Cosmetics.Restore));
+        NativeStyle.Button(_body, "Restore equipped appearance", () => _plugin.Run(() =>
+        {
+            _plugin.Cosmetics.Restore();
+            FillGrid();
+        }));
         NativeStyle.Label(_body, "Appearance is saved between launches. Steam inventory is unchanged.", 42, 12).textWrappingMode = TextWrappingModes.Normal;
         FillGrid();
     }
@@ -286,7 +290,6 @@ internal sealed class ModWindow : MonoBehaviour
         if (!_grid) return;
         _catalogHint.text = _slot == "emote"
             ? "Click an emote to send. Use + / - to add or remove it from your wheel."
-            : _slot == "bongos" ? "Bongos are the instruments in front of your cat's paws."
             : "Click an item to apply and save your appearance.";
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
         var items = _plugin.Cosmetics.Items(_slot, _search ? _search.text : "").ToList();
@@ -304,8 +307,13 @@ internal sealed class ModWindow : MonoBehaviour
                     _plugin.Cosmetics.SendEmote(cosmetic);
                     _emoteFeedback = _plugin.Cosmetics.EmoteStatus;
                 }
-                else _plugin.Cosmetics.Select(cosmetic);
+                else
+                {
+                    _plugin.Cosmetics.Select(cosmetic);
+                    FillGrid();
+                }
             }));
+            card.gameObject.name = cosmetic.ItemName;
             var imageRect = NativeStyle.Rect("Icon", card.transform);
             imageRect.anchorMin = new Vector2(0, 0.26f);
             imageRect.anchorMax = Vector2.one;
@@ -318,6 +326,15 @@ internal sealed class ModWindow : MonoBehaviour
             label.text = (cosmetic.IsEmote && _plugin.Wheel.Contains(cosmetic.Id) ? "[Wheel] " : "") + cosmetic.ItemName;
             label.fontSize = 10;
             label.rectTransform.anchorMax = new Vector2(1, 0.25f);
+            if (!cosmetic.IsEmote)
+            {
+                NativeStyle.Stretch(imageRect, 4);
+                label.gameObject.SetActive(false);
+                var frame = NativeStyle.Rect("Selected item", card.transform);
+                NativeStyle.Stretch(frame);
+                frame.gameObject.AddComponent<RoundedGraphic>().InitializeSelection();
+                frame.gameObject.SetActive(_plugin.Cosmetics.Selected(cosmetic));
+            }
             if (cosmetic.IsEmote)
             {
                 var toggle = NativeStyle.IconButton(card.transform,
