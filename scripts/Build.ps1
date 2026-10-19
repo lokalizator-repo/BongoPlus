@@ -27,5 +27,5 @@ New-Item -ItemType Directory -Path $loaderConfig -Force | Out-Null
 $plugins = Join-Path $package 'BepInEx/plugins/BongoCatMods'
 New-Item -ItemType Directory -Path $plugins -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot 'src/BongoCat.Mod/bin/Release/net472/BongoCat.Mod.dll') -Destination $plugins -Force
-Compress-Archive -Path (Join-Path $package '*') -DestinationPath (Join-Path $projectRoot 'artifacts/BongoCatMods-0.1.10.zip') -Force
+Compress-Archive -Path (Join-Path $package '*') -DestinationPath (Join-Path $projectRoot 'artifacts/BongoCatMods-0.1.11.zip') -Force
 Write-Output "Package ready: $package"

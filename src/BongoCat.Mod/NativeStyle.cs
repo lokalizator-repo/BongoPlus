@@ -64,10 +64,21 @@ internal static class NativeStyle
 
     public static Button IconButton(Transform parent, ControlIcon icon, UnityEngine.Events.UnityAction click)
     {
-        var button = CreateButton(parent, icon.ToString(), click, 28);
-        var glyph = Rect("Glyph", button.transform);
-        Stretch(glyph, 4);
-        glyph.gameObject.AddComponent<ControlGlyph>().Icon = icon;
+        var rect = Rect(icon.ToString(), parent);
+        rect.sizeDelta = new Vector2(28, 28);
+        var graphic = rect.gameObject.AddComponent<ControlButtonGraphic>();
+        graphic.Initialize(icon);
+        var button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = graphic;
+        var colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.14f, 1.14f, 1.14f, 1);
+        colors.pressedColor = new Color(0.82f, 0.82f, 0.82f, 1);
+        colors.selectedColor = Color.white;
+        button.colors = colors;
+        button.onClick.AddListener(click);
+        var layout = rect.gameObject.AddComponent<LayoutElement>();
+        layout.preferredWidth = layout.preferredHeight = 28;
         return button;
     }
 
