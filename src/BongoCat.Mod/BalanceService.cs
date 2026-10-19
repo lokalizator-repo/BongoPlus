@@ -21,8 +21,6 @@ internal sealed class BalanceService : IDisposable
     public bool Healthy { get; private set; } = true;
     public bool HasBackup => _original != null;
 
-    public void CaptureCurrent() => SaveBackup((int)GameAccess.Gained.GetValue(Pets.Instance), (int)GameAccess.Spent.GetValue(Pets.Instance));
-
     public BalanceService(ManualLogSource log)
     {
         _log = log;
@@ -33,9 +31,8 @@ internal sealed class BalanceService : IDisposable
         if (!GameAccess.Ready || _waiting)
             throw new InvalidOperationException("Wait for Steam stats to finish loading or saving.");
 
-        var pets = Pets.Instance;
-        var oldGained = (int)GameAccess.Gained.GetValue(pets);
-        var oldSpent = (int)GameAccess.Spent.GetValue(pets);
+        if (!SteamUserStats.GetStat("BongoTap", out int oldGained) || !SteamUserStats.GetStat("BongoMinus", out int oldSpent))
+            throw new InvalidOperationException("Steam could not read BongoTap/BongoMinus. Wait for stats to load.");
         var next = BalanceMath.SetBalance(oldGained, oldSpent, target);
         SaveBackup(oldGained, oldSpent);
         Write(next.Gained, next.Spent, oldGained, oldSpent);
@@ -48,8 +45,7 @@ internal sealed class BalanceService : IDisposable
         if (!GameAccess.Ready || _waiting)
             throw new InvalidOperationException("Wait for Steam stats to finish loading or saving.");
 
-        Write(_original.Gained, _original.Spent,
-            (int)GameAccess.Gained.GetValue(Pets.Instance), (int)GameAccess.Spent.GetValue(Pets.Instance));
+        Set(Math.Max(0, _original.Gained - _original.Spent));
     }
 
     private void SaveBackup(int gained, int spent)
@@ -65,16 +61,18 @@ internal sealed class BalanceService : IDisposable
 
     private void Write(int gained, int spent, int oldGained, int oldSpent)
     {
-        if (!SteamUserStats.SetStat("BongoTap", gained) || !SteamUserStats.SetStat("BongoMinus", spent))
-        {
-            RestoreCached(oldGained, oldSpent);
-            throw new InvalidOperationException("Steam refused the balance change.");
-        }
+        var changeGained = gained != oldGained;
+        var changeSpent = spent != oldSpent;
+        if (gained < oldGained || spent < oldSpent || (changeGained && changeSpent))
+            throw new InvalidOperationException("Balance changes must update one increasing Steam counter.");
 
-        if (!SteamUserStats.StoreStats())
+        var stat = changeGained ? "BongoTap" : "BongoMinus";
+        var value = changeGained ? gained : spent;
+        _log.LogInfo($"Balance request: BongoTap {oldGained} -> {gained}, BongoMinus {oldSpent} -> {spent}.");
+        if ((changeGained || changeSpent) && !SteamUserStats.SetStat(stat, value))
         {
-            RestoreCached(oldGained, oldSpent);
-            throw new InvalidOperationException("Steam could not queue the stats save.");
+            _log.LogWarning($"SetStat rejected {stat}={value}. Both counters are increment-only in the installed schema.");
+            throw new InvalidOperationException("Steam refused " + stat + " = " + value + ". See the log for counter values.");
         }
 
         GameAccess.Gained.SetValue(Pets.Instance, gained);
@@ -83,14 +81,10 @@ internal sealed class BalanceService : IDisposable
         _waiting = true;
         Healthy = true;
         _requestedAt = UnityEngine.Time.realtimeSinceStartup;
-        Status = "Balance updated; waiting for Steam save.";
+        Status = SteamUserStats.StoreStats()
+            ? "Balance updated; waiting for Steam save."
+            : "Balance cached; Steam save deferred. Waiting for the game's next save.";
         _log.LogInfo(Status);
-    }
-
-    private static void RestoreCached(int gained, int spent)
-    {
-        SteamUserStats.SetStat("BongoTap", gained);
-        SteamUserStats.SetStat("BongoMinus", spent);
     }
 
     private void OnStored(UserStatsStored_t result)
@@ -98,6 +92,12 @@ internal sealed class BalanceService : IDisposable
         if (!_waiting || result.m_nGameID != 3419430UL) return;
         _waiting = false;
         Healthy = result.m_eResult == EResult.k_EResultOK;
+        if (!Healthy && SteamUserStats.GetStat("BongoTap", out int gained) && SteamUserStats.GetStat("BongoMinus", out int spent))
+        {
+            GameAccess.Gained.SetValue(Pets.Instance, gained);
+            GameAccess.Spent.SetValue(Pets.Instance, spent);
+            GameAccess.RefreshStats.Invoke(Pets.Instance, null);
+        }
         Status = result.m_eResult == EResult.k_EResultOK
             ? "Steam confirmed the stats save."
             : "Steam save failed: " + result.m_eResult + ". Stop automation and reload stats.";

@@ -9,19 +9,39 @@ void Check(bool condition, string name)
 }
 
 var ordinary = BalanceMath.SetBalance(10000, 3000, 500);
-Check(ordinary == (3500, 3000), "Setting balance preserves spent history when it fits");
-var capped = BalanceMath.SetBalance(BalanceMath.Maximum, 5732000, BalanceMath.Maximum);
-Check(capped == (BalanceMath.Maximum, 0), "Setting maximum balance cannot overflow");
-var reset = BalanceMath.MakeRoom(BalanceMath.Maximum, BalanceMath.Maximum, 1);
-Check(reset == (0, 0), "Counter reset at the ceiling can earn again");
-var room = BalanceMath.MakeRoom(BalanceMath.Maximum, 5732000, 1);
-Check((long)room.Gained - room.Spent == (long)BalanceMath.Maximum - 5732000, "Rebasing preserves available points");
-Check(room.Gained + 1 <= BalanceMath.Maximum, "Rebasing makes room for an actual click");
-Check(BalanceMath.MakeRoom(100, 20, 2) == (100, 20), "Ordinary clicks keep their history");
-Check(BalanceMath.MakeRoom(BalanceMath.Maximum, 0, 1) == (BalanceMath.Maximum, 0), "A full unspent balance stays capped");
+Check(ordinary == (10000, 9500), "Lowering balance increases spent without decreasing earned clicks");
+var increased = BalanceMath.SetBalance(10000, 3000, 8000);
+Check(increased == (11000, 3000), "Raising balance increases earned clicks without decreasing spent");
+Check(BalanceMath.SetBalance(10000, 3000, 7000) == (10000, 3000), "An unchanged balance needs no stat update");
+Check(BalanceMath.SetBalance(10000, 3000, 0) == (10000, 10000), "Setting zero respects increment-only counters");
+var capped = BalanceMath.SetBalance(BalanceMath.Maximum, 5732000, BalanceMath.Maximum - 5732000);
+Check(capped == (BalanceMath.Maximum, 5732000), "Maximum attainable balance preserves spent history");
+var overLimit = false;
+try { BalanceMath.SetBalance(BalanceMath.Maximum, 5732000, BalanceMath.Maximum); }
+catch (ArgumentOutOfRangeException) { overLimit = true; }
+Check(overLimit, "A balance requiring a decreasing counter is rejected before any write");
+var resetBlocked = false;
+try { BalanceMath.SetBalance(BalanceMath.Maximum, BalanceMath.Maximum, 1); }
+catch (ArgumentOutOfRangeException) { resetBlocked = true; }
+Check(resetBlocked, "A fully exhausted pair of Steam counters cannot be rebased");
 var rejected = false;
 try { BalanceMath.SetBalance(0, 0, -1); } catch (ArgumentOutOfRangeException) { rejected = true; }
 Check(rejected, "Negative balances are rejected");
+
+var restore = BalanceMath.SetBalance(11000, 3000, 7000);
+Check(restore == (11000, 4000), "Restoring an earlier balance preserves increasing history");
+var random = new Random(3419430);
+var allPlansValid = true;
+for (var i = 0; i < 5000; i++)
+{
+    var gained = random.Next(1, BalanceMath.Maximum);
+    var spent = random.Next(0, gained);
+    var target = random.Next(0, BalanceMath.Maximum - spent);
+    var next = BalanceMath.SetBalance(gained, spent, target);
+    allPlansValid &= next.Gained >= gained && next.Spent >= spent && next.Gained - next.Spent == target &&
+        (next.Gained == gained || next.Spent == spent);
+}
+Check(allPlansValid, "5000 balance plans satisfy Steam monotonicity and change at most one counter");
 
 var policy = new AutomationPolicy { Limit = 1000 };
 Check(!policy.Observe("friend:skin", true, 0), "A newly observed ready chest waits for stable state");

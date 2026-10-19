@@ -133,7 +133,8 @@ internal sealed class ModWindow : MonoBehaviour
         if (!_panel.gameObject.activeSelf || Time.realtimeSinceStartup < _nextRefresh) return;
         _nextRefresh = Time.realtimeSinceStartup + 0.5f;
         if (_balance) _balance.text = "Available points: " + GameAccess.Balance.ToString("N0", CultureInfo.InvariantCulture);
-        if (_detail) _detail.text = _plugin.Balance.Status + "\nSession spent: " + _plugin.Automation.Spent.ToString("N0") + " / " + _plugin.Automation.Limit.ToString("N0");
+        if (_detail) _detail.text = _plugin.Balance.Status + "\nSession spent: " + _plugin.Automation.Spent.ToString("N0") + " / " + _plugin.Automation.Limit.ToString("N0") +
+            "\nMax balance: " + Math.Max(0, BalanceMath.Maximum - (int)GameAccess.Spent.GetValue(Pets.Instance)).ToString("N0");
         if (_applyBalance) _applyBalance.interactable = GameAccess.Ready && !_plugin.Balance.Pending;
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
@@ -184,13 +185,12 @@ internal sealed class ModWindow : MonoBehaviour
             _plugin.Balance.Set(target);
             _error = null;
         }));
-        _restoreBalance = NativeStyle.Button(actions, "Restore backup", () => _plugin.Run(() =>
+        _restoreBalance = NativeStyle.Button(actions, "Restore balance", () => _plugin.Run(() =>
         {
             _plugin.Automation.Stop();
             _plugin.Balance.Restore();
             _error = null;
         }));
-        ToggleRow("Repair saturated click counter", () => _plugin.RepairCap, v => _plugin.RepairCap = v);
         _detail = NativeStyle.Label(_body, "", 54, 12);
         _detail.textWrappingMode = TextWrappingModes.Normal;
         NativeStyle.Label(_body, "CHEST AUTOMATION", 25, 17);

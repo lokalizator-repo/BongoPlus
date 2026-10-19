@@ -10,19 +10,14 @@ internal static class BalanceMath
     {
         if (target < 0 || target > Maximum)
             throw new ArgumentOutOfRangeException(nameof(target));
+        if (gained < 0 || spent < 0 || gained < spent)
+            throw new ArgumentException("Steam counters are inconsistent. Reload the game before changing balance.");
 
-        if (spent >= 0 && (long)spent + target <= Maximum)
-            return (spent + target, spent);
+        var nextGained = Math.Max(gained, (long)spent + target);
+        if (nextGained > Maximum)
+            throw new ArgumentOutOfRangeException(nameof(target),
+                "Steam counters can only increase. Maximum available balance is " + Math.Max(0, Maximum - spent).ToString("N0") + ".");
 
-        return (target, 0);
-    }
-
-    public static (int Gained, int Spent) MakeRoom(int gained, int spent, int amount)
-    {
-        if (amount <= 0 || (long)gained + amount <= Maximum || spent <= 0)
-            return (gained, spent);
-
-        var reclaimed = Math.Min(gained, spent);
-        return (gained - reclaimed, spent - reclaimed);
+        return ((int)nextGained, (int)nextGained - target);
     }
 }

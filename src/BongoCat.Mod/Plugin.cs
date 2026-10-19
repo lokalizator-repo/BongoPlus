@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using BepInEx;
-using BepInEx.Configuration;
 using BongoCat;
 using HarmonyLib;
 using UnityEngine;
@@ -14,7 +13,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.1.1";
+    public const string Version = "0.1.2";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -22,7 +21,6 @@ public sealed class Plugin : BaseUnityPlugin
     internal CosmeticService Cosmetics = null!;
     private Harmony? _harmony;
     private ModWindow _window = null!;
-    private ConfigEntry<bool> _repairCap = null!;
     private bool _failed;
     private float _nextInit;
 
@@ -38,8 +36,6 @@ public sealed class Plugin : BaseUnityPlugin
             if (actual != ExpectedAssembly)
                 throw new InvalidOperationException("Game build changed. This plugin requires a compatibility update.");
 
-            _repairCap = Config.Bind("Balance", "RepairSaturatedCounter", false,
-                "Reclaim spent counter space before a real click reaches the integer ceiling.");
             Balance = new BalanceService(Logger);
             Automation = new AutomationService(Logger, Balance);
             Cosmetics = new CosmeticService();
@@ -91,8 +87,6 @@ public sealed class Plugin : BaseUnityPlugin
         }
     }
 
-    internal bool RepairCap { get => _repairCap.Value; set => _repairCap.Value = value; }
-
     private void OnDestroy()
     {
         if (Instance != this) return;
@@ -107,23 +101,6 @@ public sealed class Plugin : BaseUnityPlugin
     private static class PurchaseFinished
     {
         private static void Postfix(ShopItem __instance, int itemId) => Instance?.Automation?.OnPurchaseFinished(__instance, itemId);
-    }
-
-    [HarmonyPatch(typeof(Pets), nameof(Pets.AddPet))]
-    private static class ReclaimSpentCounter
-    {
-        private static void Prefix(Pets __instance, int value)
-        {
-            if (Instance == null || !Instance.RepairCap || !GameAccess.Ready) return;
-            var gained = (int)GameAccess.Gained.GetValue(__instance);
-            var spent = (int)GameAccess.Spent.GetValue(__instance);
-            var rebased = BalanceMath.MakeRoom(gained, spent, value);
-            if (rebased == (gained, spent)) return;
-            try { Instance.Balance.CaptureCurrent(); }
-            catch (Exception error) { Instance.Logger.LogError(error); Instance.RepairCap = false; return; }
-            GameAccess.Gained.SetValue(__instance, rebased.Gained);
-            GameAccess.Spent.SetValue(__instance, rebased.Spent);
-        }
     }
 
     [HarmonyPatch(typeof(CatCosmetics), nameof(CatCosmetics.Validate))]
