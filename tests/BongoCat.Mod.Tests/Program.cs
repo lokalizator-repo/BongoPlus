@@ -44,15 +44,18 @@ for (var i = 0; i < 5000; i++)
 Check(allPlansValid, "5000 balance plans satisfy Steam monotonicity and change at most one counter");
 
 var policy = new AutomationPolicy();
-Check(!policy.Observe("friend:skin", true, 0), "A newly observed ready chest waits for stable state");
-Check(policy.Observe("friend:skin", true, 2), "A stable ready chest can receive one gift");
+Check(policy.Observe("friend:skin", true), "An advertised ready chest is eligible without an artificial delay");
 policy.Record("friend:skin");
-Check(!policy.Observe("friend:skin", true, 10), "Repeated ready events cannot duplicate a gift");
-policy.Observe("friend:skin", false, 11);
-Check(!policy.Observe("friend:skin", true, 12) && policy.Observe("friend:skin", true, 14), "A new chest cycle becomes eligible");
-policy.Observe("other:skin", true, 12);
-Check(policy.Observe("other:skin", true, 14), "A gift to one player cannot block a different recipient");
+Check(!policy.Observe("friend:skin", true), "Repeated ready events cannot duplicate a gift");
+Check(!policy.NeedsUiReset("friend:skin"), "The current paid request cannot reset its own click guard");
+Check(policy.Observe("friend:emote", true), "A cosmetic gift cannot block the same recipient's emote chest");
+policy.Record("friend:emote");
+policy.Observe("friend:skin", false);
+Check(policy.Observe("friend:skin", true) && policy.NeedsUiReset("friend:skin"), "An explicit new chest cycle releases a stale UI click guard");
+Check(!policy.Observe("friend:emote", true), "Resetting the cosmetic cycle does not release the emote request");
+Check(policy.Observe("other:skin", true), "A gift to one player cannot block a different recipient");
 policy.Record("friend:skin");
+Check(!policy.NeedsUiReset("friend:skin"), "Sending the next gift consumes the UI reset permission");
 policy.NewLobby();
-Check(!policy.Observe("friend:skin", true, 20) && policy.Observe("friend:skin", true, 22), "A new lobby requires a fresh stable observation");
+Check(policy.Observe("friend:skin", true) && !policy.NeedsUiReset("friend:skin"), "A new lobby clears old requests without resetting an unrelated UI click");
 Console.WriteLine($"{passed} checks passed.");

@@ -206,6 +206,8 @@ internal sealed class ModWindow : MonoBehaviour
         NativeStyle.Label(_body, "Your points pay for their chest. They receive the item.", 42, 13).textWrappingMode = TextWrappingModes.Normal;
         ToggleRow("Auto-gift ready chests", () => _plugin.Automation.Gift, v => _plugin.Automation.Gift = v);
         ToggleRow("Include everyone in this lobby", () => _plugin.Automation.AllPlayers, v => _plugin.Automation.AllPlayers = v);
+        ToggleRow("Cosmetic chests", () => _plugin.Automation.Cosmetics, v => _plugin.Automation.Cosmetics = v);
+        ToggleRow("Emote chests", () => _plugin.Automation.Emotes, v => _plugin.Automation.Emotes = v);
         NativeStyle.Button(_body, "Refresh players", () => ShowTab(1));
         var players = _plugin.Automation.Players().ToList();
         if (players.Count == 0) NativeStyle.Label(_body, "Join a lobby to choose recipients.", 35, 14);
@@ -218,7 +220,6 @@ internal sealed class ModWindow : MonoBehaviour
                 else _plugin.Automation.SelectedPlayers.Remove(id);
             });
         }
-        NativeStyle.Label(_body, "Choose chest types in General.", 30, 13);
         NativeStyle.Button(_body, "Stop all automation", () => _plugin.Automation.Stop());
     }
 

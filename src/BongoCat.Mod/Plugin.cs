@@ -13,7 +13,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.1.3";
+    public const string Version = "0.1.4";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -107,5 +107,15 @@ public sealed class Plugin : BaseUnityPlugin
     private static class RefreshAppearance
     {
         private static void Postfix() => Instance?.Cosmetics?.Apply(true);
+    }
+
+    [HarmonyPatch(typeof(BongoCat.Multiplayer.OpenChestForMember), nameof(BongoCat.Multiplayer.OpenChestForMember.OnClicked))]
+    private static class GiftClicked
+    {
+        private static void Prefix(BongoCat.Multiplayer.OpenChestForMember __instance, out bool __state) =>
+            __state = AutomationService.WasGiftClicked(__instance);
+
+        private static void Postfix(BongoCat.Multiplayer.OpenChestForMember __instance, bool __state) =>
+            Instance?.Automation?.OnGiftClicked(__instance, __state);
     }
 }

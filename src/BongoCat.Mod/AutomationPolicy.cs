@@ -5,32 +5,30 @@ namespace BongoCatMod;
 internal sealed class AutomationPolicy
 {
     private readonly HashSet<string> _sent = new HashSet<string>();
-    private readonly Dictionary<string, double> _firstReady = new Dictionary<string, double>();
+    private readonly HashSet<string> _newCycle = new HashSet<string>();
 
-    public bool Observe(string key, bool ready, double now)
+    public bool Observe(string key, bool ready)
     {
         if (!ready)
         {
             _sent.Remove(key);
-            _firstReady.Remove(key);
+            _newCycle.Add(key);
             return false;
         }
-        if (!_firstReady.TryGetValue(key, out var since))
-        {
-            _firstReady[key] = now;
-            return false;
-        }
-        return !_sent.Contains(key) && now - since >= 2d;
+        return !_sent.Contains(key);
     }
+
+    public bool NeedsUiReset(string key) => _newCycle.Contains(key);
 
     public void Record(string key)
     {
         _sent.Add(key);
+        _newCycle.Remove(key);
     }
 
     public void NewLobby()
     {
         _sent.Clear();
-        _firstReady.Clear();
+        _newCycle.Clear();
     }
 }
