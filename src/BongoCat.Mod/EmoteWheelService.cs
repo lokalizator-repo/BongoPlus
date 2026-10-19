@@ -15,6 +15,7 @@ internal sealed class EmoteWheelService
     private readonly ModSettings _settings;
     private readonly ManualLogSource _log;
     private readonly HashSet<int> _pinned;
+    private int[] _order;
     private EmoteDonut? _readyWheel;
     private int _validationDepth;
     private float _nextRefresh;
@@ -26,6 +27,7 @@ internal sealed class EmoteWheelService
         _settings = settings;
         _log = log;
         _pinned = settings.ReadWheelEmotes();
+        _order = CosmeticPreferences.ReadIds(settings.WheelOrder.Value).ToArray();
     }
 
     public void OnReady(EmoteDonut wheel)
@@ -43,16 +45,31 @@ internal sealed class EmoteWheelService
     public bool Contains(EmoteDonut wheel, int id) => GetEntries(wheel).ContainsKey(id);
     public bool Contains(int id) => EmoteDonut.Instance && Contains(EmoteDonut.Instance, id);
 
+    public int[] OrderIds(IEnumerable<int> available) => CosmeticPreferences.Order(available, _order);
+
+    public int[] ItemIds => EmoteDonut.Instance ? OrderIds(GetEntries(EmoteDonut.Instance).Keys) : Array.Empty<int>();
+
+    public void Move(int id, int targetIndex)
+    {
+        _order = CosmeticPreferences.Move(ItemIds, id, targetIndex);
+        _settings.WheelOrder.Value = CosmeticPreferences.WriteIds(_order);
+        _settings.Save();
+        EmoteDonut.Instance?.GetComponent<WheelPager>()?.Refresh();
+        Status = "Wheel order saved.";
+    }
+
     public void ObserveToggle(SteamItemRuntime item, bool wasInWheel)
     {
-        if (!wasInWheel || Contains(item.Id) || !_pinned.Remove(item.Id)) return;
+        if (!wasInWheel || Contains(item.Id)) return;
+        _pinned.Remove(item.Id);
+        _order = _order.Where(id => id != item.Id).ToArray();
         Save();
         Status = item.ItemName + " — removed from wheel.";
     }
 
     public void Toggle(SteamItemRuntime item)
     {
-        if (!item.IsEmote) throw new ArgumentException("Choose a standard emote.", nameof(item));
+        if (!item.IsEmote && !Contains(item.Id)) throw new ArgumentException("Choose a standard emote.", nameof(item));
         var wheel = EmoteDonut.Instance;
         if (!wheel || _readyWheel != wheel || !CatInventory.Instance || !CatInventory.Instance.IsInitialized)
             throw new InvalidOperationException("Wait for your emote wheel and inventory to load.");
@@ -75,6 +92,7 @@ internal sealed class EmoteWheelService
             throw;
         }
         Save();
+        EmoteDonut.Instance?.GetComponent<WheelPager>()?.Refresh();
         Status = item.ItemName + " — added to native wheel.";
         _log.LogInfo("Native wheel emote added: item=" + item.Id + ".");
     }
@@ -93,6 +111,13 @@ internal sealed class EmoteWheelService
             wheel.ToggleItem(item);
             _log.LogInfo("Native wheel emote restored: item=" + id + ".");
         }
+        var order = ItemIds;
+        if (!_order.SequenceEqual(order))
+        {
+            _order = order;
+            Save();
+            wheel.GetComponent<WheelPager>()?.Refresh();
+        }
     }
 
     private static Dictionary<int, EmoteDonutEntry> GetEntries(EmoteDonut wheel) =>
@@ -101,6 +126,7 @@ internal sealed class EmoteWheelService
     private void Save()
     {
         _settings.SetWheelEmotes(_pinned);
+        _settings.WheelOrder.Value = CosmeticPreferences.WriteIds(_order);
         _settings.Save();
     }
 }

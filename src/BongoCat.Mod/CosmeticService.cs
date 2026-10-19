@@ -17,6 +17,9 @@ internal sealed class CosmeticService
     private bool _restorePending = true;
     private float _nextRefresh;
     private bool _dirty;
+    private readonly HashSet<int> _favorites;
+    private readonly List<AppearancePreset> _presets;
+    public IReadOnlyList<AppearancePreset> Presets => _presets;
     public bool Publish { get; private set; } = true;
     public string Status { get; private set; } = "Using your normal equipped cosmetics.";
     public string EmoteStatus { get; private set; } = "Click an emote to send it.";
@@ -26,6 +29,8 @@ internal sealed class CosmeticService
         _log = log;
         _settings = settings;
         Publish = settings.ShareAppearance.Value;
+        _favorites = new HashSet<int>(CosmeticPreferences.ReadIds(settings.Favorites.Value));
+        _presets = CosmeticPreferences.ReadPresets(settings.Presets.Value);
     }
 
     public void SetPublish(bool value)
@@ -51,6 +56,62 @@ internal sealed class CosmeticService
             throw new ArgumentException("Choose a skin or hat.", nameof(item));
         _selected[item.ItemSlot] = item.Id;
         _settings.Appearance[item.ItemSlot].Value = item.Id;
+        _settings.Save();
+        _dirty = true;
+        Apply();
+    }
+
+    public bool IsFavorite(int id) => _favorites.Contains(id);
+
+    public void ToggleFavorite(int id)
+    {
+        if (!_favorites.Add(id)) _favorites.Remove(id);
+        _settings.Favorites.Value = CosmeticPreferences.WriteIds(_favorites.OrderBy(value => value));
+        _settings.Save();
+    }
+
+    public void SavePreset(string name)
+    {
+        name = name.Trim();
+        if (name.Length == 0 || name.Length > 40) throw new ArgumentException("Use a preset name with 1–40 characters.");
+        if (!Cat.Instance || !CatCosmetics.Instance) throw new InvalidOperationException("Wait for your cat to load.");
+        int Current(string slot) => _selected.TryGetValue(slot, out var id) ? id :
+            CatCosmetics.Instance.EquippedItems.FirstOrDefault(item => item.ItemSlot == slot)?.Id ?? -2;
+        var preset = new AppearancePreset(name, Current("skin"), Current("hat"));
+        var index = _presets.FindIndex(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0) _presets[index] = preset;
+        else _presets.Add(preset);
+        SavePresets();
+        SetStatus("Preset saved: " + name + ".");
+    }
+
+    public void DeletePreset(AppearancePreset preset)
+    {
+        _presets.Remove(preset);
+        SavePresets();
+        SetStatus("Preset deleted: " + preset.Name + ".");
+    }
+
+    private void SavePresets()
+    {
+        _settings.Presets.Value = CosmeticPreferences.WritePresets(_presets);
+        _settings.Save();
+    }
+
+    public void ApplyPreset(AppearancePreset preset)
+    {
+        if (!Cat.Instance || !SteamItemIdReference.Inst) throw new InvalidOperationException("Wait for your cat to load.");
+        var values = new Dictionary<string, int> { ["skin"] = preset.Skin, ["hat"] = preset.Hat };
+        foreach (var pair in values)
+            if (pair.Value >= 0 && (!SteamItemIdReference.Inst.Ids.Contains(pair.Value) ||
+                SteamItemIdReference.Inst[pair.Value].ItemSlot != pair.Key || !SteamItemIdReference.Inst[pair.Value].Icon))
+                throw new InvalidOperationException("This preset contains an unavailable " + pair.Key + ". Save it again with current items.");
+        foreach (var pair in values)
+        {
+            _selected[pair.Key] = pair.Value < 0 ? -2 : pair.Value;
+            _settings.Appearance[pair.Key].Value = _selected[pair.Key];
+        }
+        _restorePending = false;
         _settings.Save();
         _dirty = true;
         Apply();
@@ -93,7 +154,7 @@ internal sealed class CosmeticService
             {
                 var id = pair.Value.Value;
                 if (id == -1 || _selected.ContainsKey(pair.Key)) continue;
-                if (!SteamItemIdReference.Inst.Ids.Contains(id) || SteamItemIdReference.Inst[id].ItemSlot != pair.Key)
+                if (id != -2 && (!SteamItemIdReference.Inst.Ids.Contains(id) || SteamItemIdReference.Inst[id].ItemSlot != pair.Key))
                 {
                     _log.LogWarning("Ignoring saved cosmetic: slot=" + pair.Key + ", item=" + id + ".");
                     continue;
@@ -111,13 +172,13 @@ internal sealed class CosmeticService
         {
             if (_dirty || force)
             {
-                var item = SteamItemIdReference.Inst[pair.Value];
-                Cat.Instance.SetItem(item, false);
+                if (pair.Value == -2) Cat.Instance.ClearItemSlot(pair.Key);
+                else Cat.Instance.SetItem(SteamItemIdReference.Inst[pair.Value], false);
             }
             if (Publish && lobby.IsValid)
             {
                 var me = lobby.Me;
-                var value = pair.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var value = Math.Max(-1, pair.Value).ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (me[pair.Key] != value)
                 {
                     synchronized = false;

@@ -31,6 +31,17 @@ internal sealed class AutomationService
     private readonly Dictionary<string, string> _giftStates = new Dictionary<string, string>();
     private readonly Dictionary<string, float> _sentAt = new Dictionary<string, float>();
     private ulong _lobby;
+    private readonly ModSettings _settings;
+    private bool _resumeOwn;
+    private bool _resumeGift;
+    private readonly Queue<string> _recent = new Queue<string>();
+    public AutomationActivity Activity { get; } = new AutomationActivity();
+    public string? Error { get; private set; }
+    public bool CanRetry => Error != null && !_pendingOwn && _balance.Healthy && !_balance.Pending &&
+        GameAccess.Ready && !GameAccess.IsOpening(Shop.NormalShop) && !GameAccess.IsOpening(Shop.EmoteShop);
+    public string Recent => string.Join("\n", _recent);
+    public string Summary => "This session · Opened: " + Activity.OwnOpened + " · Gifts sent: " + Activity.GiftRequests +
+        "\nGift ready cleared: " + Activity.GiftReadyCleared + " · Awaiting ready change: " + Activity.PendingGifts;
 
     public bool BuyOwn;
     public bool Gift;
@@ -44,6 +55,7 @@ internal sealed class AutomationService
     {
         _log = log;
         _balance = balance;
+        _settings = settings;
         BuyOwn = settings.BuyOwn.Value;
         Gift = settings.Gift.Value;
         Cosmetics = settings.CosmeticChests.Value;
@@ -56,8 +68,41 @@ internal sealed class AutomationService
     {
         BuyOwn = false;
         Gift = false;
+        Error = null;
+        _resumeOwn = _resumeGift = false;
         Status = reason;
         _log.LogInfo(reason);
+    }
+
+    private void Fail(string reason)
+    {
+        if (Error == null) { _resumeOwn = BuyOwn; _resumeGift = Gift; }
+        BuyOwn = Gift = false;
+        _settings.BuyOwn.Value = _settings.Gift.Value = false;
+        _settings.Save();
+        Error = reason;
+        Record(reason);
+    }
+
+    public void Retry()
+    {
+        if (!CanRetry) throw new InvalidOperationException("Wait for the pending exchange and Steam stats to finish. Reload the game if Steam stats failed.");
+        BuyOwn = _resumeOwn;
+        Gift = _resumeGift;
+        _settings.BuyOwn.Value = BuyOwn;
+        _settings.Gift.Value = Gift;
+        _settings.Save();
+        Error = null;
+        _nextScan = _nextOwn = _nextGift = 0;
+        Record("Automation resumed. Existing gift requests will not be paid again.");
+    }
+
+    private void Record(string message)
+    {
+        Status = message;
+        if (_recent.Count == 5) _recent.Dequeue();
+        _recent.Enqueue(DateTime.Now.ToString("HH:mm:ss") + "  " + message);
+        _log.LogInfo(message);
     }
 
     public void Tick()
@@ -73,18 +118,20 @@ internal sealed class AutomationService
             _policy.NewLobby();
             _giftStates.Clear();
             _sentAt.Clear();
+            Activity.LeaveLobby();
             _chestViews = Array.Empty<OpenChestForMember>();
             _nextViewRefresh = 0;
         }
+        if (_pendingOwn && now - _pendingAt > 45f && Error == null)
+            Fail("Chest exchange timed out. Waiting for its final result before retry is available.");
+        if (lobby != 0 && (Gift || _sentAt.Count > 0))
+            TickGifts(now, Gift && Error == null && GameAccess.Ready && !_balance.Pending && _balance.Healthy);
+        if (Error != null) return;
         if ((!BuyOwn && !Gift) || !GameAccess.Ready || _balance.Pending) return;
-        if (!_balance.Healthy) { Stop("Steam stats save failed. Reload stats before using automation."); return; }
-
-        if (Gift && lobby != 0) TickGifts(now);
+        if (!_balance.Healthy) { Fail("Steam stats save failed. Restart the game to reload stats."); return; }
 
         if (_pendingOwn)
         {
-            if (Time.realtimeSinceStartup - _pendingAt > 45f)
-                Stop("Chest exchange timed out. No automatic retry.");
             return;
         }
         if (GameAccess.IsOpening(Shop.NormalShop) || GameAccess.IsOpening(Shop.EmoteShop)) return;
@@ -104,10 +151,16 @@ internal sealed class AutomationService
                 return;
             }
         }
-
+        if (Error == null)
+            Status = !Cosmetics && !Emotes ? "Choose at least one chest type."
+                : Gift && !BuyOwn && lobby == 0 ? "Join a lobby to send gifts."
+                : Gift && !BuyOwn && !AllPlayers && SelectedPlayers.Count == 0 ? "Choose recipients or enable everyone in the lobby."
+                : BuyOwn && new[] { Shop.NormalShop, Shop.EmoteShop }.Any(shop => shop && Enabled(shop.ChestType) && shop.ChestIsReady && !shop.CanAffordChest)
+                    ? "Waiting for enough points."
+                : "Watching for ready chests.";
     }
 
-    private void TickGifts(float now)
+    private void TickGifts(float now, bool allowSend)
     {
         if (now >= _nextViewRefresh)
         {
@@ -128,7 +181,11 @@ internal sealed class AutomationService
             var eligible = _policy.Observe(key, ready);
             if (!ready)
             {
-                if (_sentAt.Remove(key)) SetGiftState(key, user, type, "recipient no longer advertises this chest as ready");
+                if (_sentAt.Remove(key))
+                {
+                    Activity.ReadyCleared(key);
+                    SetGiftState(key, user, type, "recipient no longer advertises this chest as ready");
+                }
                 continue;
             }
             if (!eligible)
@@ -137,7 +194,7 @@ internal sealed class AutomationService
                     SetGiftState(key, user, type, "request sent, still ready; no paid retry without a new chest cycle");
                 continue;
             }
-            if (!Enabled(type)) continue;
+            if (!allowSend || !Enabled(type)) continue;
             if (!AllPlayers && !SelectedPlayers.Contains(user.SteamId)) continue;
             if (_policy.NeedsUiReset(key))
             {
@@ -160,6 +217,7 @@ internal sealed class AutomationService
             if (!(bool)Clicked.GetValue(chest)) continue;
             _policy.Record(key);
             _sentAt[key] = now;
+            Activity.GiftSent(key);
             SetGiftState(key, user, type, "gift request sent");
             _nextGift = now + 0.5f;
         }
@@ -169,8 +227,7 @@ internal sealed class AutomationService
     {
         if (_giftStates.TryGetValue(key, out var previous) && previous == state) return;
         _giftStates[key] = state;
-        Status = type + " · " + user.Name + ": " + state + ".";
-        _log.LogInfo(Status);
+        Record(type + " · " + user.Name + ": " + state + ".");
     }
 
     public void OnGiftClicked(OpenChestForMember chest, bool wasClicked)
@@ -181,6 +238,7 @@ internal sealed class AutomationService
         var key = user.SteamId + ":" + type;
         _policy.Record(key);
         _sentAt[key] = Time.realtimeSinceStartup;
+        Activity.GiftSent(key);
         SetGiftState(key, user, type, "gift request sent");
     }
 
@@ -195,10 +253,12 @@ internal sealed class AutomationService
         _pendingOwnCost = 0;
         if (itemId < 0)
         {
-            Stop("Steam chest exchange failed. No automatic retry.");
+            Fail("Steam chest exchange failed after the game's retries. Resume to watch for the next ready chest.");
             return;
         }
-        Status = "Chest opened. Item " + itemId + ".";
+        Activity.OwnCompleted();
+        Record("Chest opened. Item " + itemId + ".");
+        if (Error != null) Error = "The previous exchange completed. You can resume automation.";
         _nextOwn = Time.realtimeSinceStartup + 0.25f;
     }
 

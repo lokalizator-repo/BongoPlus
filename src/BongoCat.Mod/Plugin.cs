@@ -16,7 +16,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.1.13";
+    public const string Version = "0.2.0";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -24,6 +24,7 @@ public sealed class Plugin : BaseUnityPlugin
     internal CosmeticService Cosmetics = null!;
     internal EmoteWheelService Wheel = null!;
     private ModSettings _settings = null!;
+    internal ModSettings Settings => _settings;
     private Harmony? _harmony;
     private ModWindow _window = null!;
     private bool _failed;

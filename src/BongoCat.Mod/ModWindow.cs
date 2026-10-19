@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Globalization;
 using System.Linq;
 using BongoCat;
@@ -10,7 +11,7 @@ using UnityEngine.UI;
 
 namespace BongoCatMod;
 
-internal sealed class ModWindow : MonoBehaviour
+internal sealed partial class ModWindow : MonoBehaviour
 {
     private Plugin _plugin = null!;
     private GameObject _canvas = null!;
@@ -35,10 +36,46 @@ internal sealed class ModWindow : MonoBehaviour
     private string? _emoteFeedback;
     private BongoCat.OnDemandRenderHelper _renderOwner = null!;
     private bool _ownsRenderDemand;
+    private ModSettings _settings = null!;
+    private ScrollRect _scroll = null!;
+    private CanvasScaler _scaler = null!;
+    private float[] _scrollPositions = new float[5];
+    private int ScrollIndex => _tab == 2 ? 2 + _cosmeticView : _tab;
+    private string _query = "";
+    private bool _favoritesOnly;
+    private bool _stateDirty;
+    private float _saveAt;
+    private bool _building;
+    private Coroutine? _restoreScroll;
+    private Button _favoritesButton = null!;
+    private Button _previousPage = null!;
+    private Button _nextPage = null!;
+    private TextMeshProUGUI _emptyState = null!;
+    private RectTransform _presetList = null!;
+    private RectTransform _wheelEditor = null!;
+    private bool _editingWheel;
+    private int _cosmeticView;
+    private int _wheelPage;
+    private string _wheelSignature = "";
+    private RectTransform _tooltip = null!;
+    private TextMeshProUGUI _tooltipText = null!;
+    private Transform? _hoverOwner;
+    private string _hoverText = "";
+    private float _hoverAt;
+    private Rect _lastWorkArea;
+    private Button[] _tabs = Array.Empty<Button>();
 
     public void Initialize(Plugin plugin)
     {
         _plugin = plugin;
+        _settings = plugin.Settings;
+        _tab = Mathf.Clamp(_settings.MenuTab.Value, 0, 2);
+        _slot = new[] { "skin", "hat", "emote" }.Contains(_settings.MenuSlot.Value) ? _settings.MenuSlot.Value : "skin";
+        _query = _settings.MenuSearch.Value;
+        _page = Math.Max(0, _settings.MenuPage.Value);
+        _favoritesOnly = _settings.FavoritesOnly.Value;
+        _cosmeticView = Mathf.Clamp(_settings.CosmeticView.Value, 0, 2);
+        _scrollPositions = _settings.ReadScroll();
         NativeStyle.Font = Resources.FindObjectsOfTypeAll<TMP_Text>().Select(t => t.font).First(f => f);
         _canvas = new GameObject("Bongo Cat Mods", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         _canvas.layer = 5;
@@ -47,6 +84,7 @@ internal sealed class ModWindow : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 30000;
         var scaler = _canvas.GetComponent<CanvasScaler>();
+        _scaler = scaler;
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
         scaler.scaleFactor = Mathf.Clamp(Screen.height / 1080f, 0.8f, 1.2f);
 
@@ -54,7 +92,7 @@ internal sealed class ModWindow : MonoBehaviour
         _panel.anchorMin = _panel.anchorMax = new Vector2(1, 0);
         _panel.pivot = new Vector2(1, 0);
         _panel.anchoredPosition = new Vector2(-30, 110);
-        _panel.sizeDelta = new Vector2(420, 510);
+        _panel.sizeDelta = new Vector2(420, 560);
         NativeStyle.Image(_panel, UiSpriteRole.PopupBackground);
 
         var header = NativeStyle.Rect("Header", _panel);
@@ -77,9 +115,10 @@ internal sealed class ModWindow : MonoBehaviour
         tabs.anchorMax = Vector2.one;
         NativeStyle.Offsets(tabs, new Vector2(16, -87), new Vector2(-16, -51));
         tabs.gameObject.AddComponent<HorizontalLayoutGroup>().spacing = 6;
-        NativeStyle.Button(tabs, "General", () => ShowTab(0));
-        NativeStyle.Button(tabs, "Lobby", () => ShowTab(1));
-        NativeStyle.Button(tabs, "Cosmetics", () => ShowTab(2));
+        _tabs = new[] {
+            NativeStyle.Button(tabs, "General", () => ShowTab(0)),
+            NativeStyle.Button(tabs, "Lobby", () => ShowTab(1)),
+            NativeStyle.Button(tabs, "Cosmetics", () => ShowTab(2)) };
 
         var viewport = NativeStyle.Rect("Viewport", _panel);
         viewport.anchorMin = Vector2.zero;
@@ -96,19 +135,37 @@ internal sealed class ModWindow : MonoBehaviour
         NativeStyle.Vertical(_body);
         _body.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+        _scroll = scroll;
         scroll.viewport = viewport;
         scroll.content = _body;
         scroll.horizontal = false;
         scroll.movementType = ScrollRect.MovementType.Clamped;
         scroll.scrollSensitivity = 25;
+        scroll.onValueChanged.AddListener(_ =>
+        {
+            if (!_building && _panel.gameObject.activeSelf)
+            {
+                _scrollPositions[ScrollIndex] = Math.Max(0, _body.anchoredPosition.y);
+                StateChanged();
+            }
+        });
 
         _status = NativeStyle.Text(_panel, "F9 to toggle • v" + Plugin.Version, 12);
         _status.rectTransform.anchorMin = Vector2.zero;
         _status.rectTransform.anchorMax = new Vector2(1, 0);
         NativeStyle.Offsets(_status.rectTransform, new Vector2(18, 10), new Vector2(-18, 48));
         _status.textWrappingMode = TextWrappingModes.Normal;
+        _tooltip = NativeStyle.Rect("Tooltip", _canvas.transform);
+        _tooltip.pivot = Vector2.zero;
+        _tooltip.sizeDelta = new Vector2(270, 62);
+        NativeStyle.Image(_tooltip, UiSpriteRole.PopupBackground).raycastTarget = false;
+        _tooltipText = NativeStyle.Text(_tooltip, "", 12);
+        NativeStyle.Stretch(_tooltipText.rectTransform, 9);
+        _tooltipText.textWrappingMode = TextWrappingModes.Normal;
+        _tooltip.gameObject.SetActive(false);
         CreateMenuButton();
-        ShowTab(0);
+        ShowTab(_tab, false);
+        FitWindow();
         _panel.gameObject.SetActive(false);
     }
 
@@ -131,6 +188,9 @@ internal sealed class ModWindow : MonoBehaviour
     private void Update()
     {
         if (!_canvas) return;
+        FitWindow();
+        UpdateTooltip();
+        if (_stateDirty && Time.realtimeSinceStartup >= _saveAt) SaveState();
         if (Input.GetKeyDown(KeyCode.F9)) Toggle();
         else if (_panel.gameObject.activeSelf)
         {
@@ -149,9 +209,10 @@ internal sealed class ModWindow : MonoBehaviour
         if (_applyBalance) _applyBalance.interactable = GameAccess.Ready && !_plugin.Balance.Pending;
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
+        if (_tab == 2 && _editingWheel && _wheelSignature != string.Join(",", _plugin.Wheel.ItemIds)) FillWheelEditor();
         _status.text = _error ?? (_tab == 2
-            ? (_slot == "emote" ? _emoteFeedback ?? _plugin.Cosmetics.EmoteStatus : _plugin.Cosmetics.Status)
-            : _plugin.Automation.Status);
+            ? (_editingWheel ? _plugin.Wheel.Status : _slot == "emote" && _cosmeticView == 0 ? _emoteFeedback ?? _plugin.Cosmetics.EmoteStatus : _plugin.Cosmetics.Status)
+            : _plugin.Automation.Error ?? _plugin.Automation.Status);
     }
 
     public void Toggle() => SetVisible(!_panel.gameObject.activeSelf);
@@ -159,6 +220,7 @@ internal sealed class ModWindow : MonoBehaviour
     private void SetVisible(bool show)
     {
         if (!_panel || _panel.gameObject.activeSelf == show) return;
+        if (!show) { HideTooltip(); SaveState(); }
         _panel.gameObject.SetActive(show);
         if (show && _tab == 2) FillGrid();
         _renderOwner = OnDemandRenderHelper.Instance;
@@ -176,8 +238,12 @@ internal sealed class ModWindow : MonoBehaviour
 
     public void ShowError(string message) => _error = message;
 
-    private void ShowTab(int tab)
+    private void ShowTab(int tab, bool capture = true)
     {
+        if (capture && !_building) _scrollPositions[ScrollIndex] = Math.Max(0, _body.anchoredPosition.y);
+        if (_restoreScroll != null) StopCoroutine(_restoreScroll);
+        _building = true;
+        HideTooltip();
         _tab = tab;
         _error = null;
         _refreshers.Clear();
@@ -185,11 +251,32 @@ internal sealed class ModWindow : MonoBehaviour
         _detail = null!;
         _applyBalance = null!;
         _restoreBalance = null!;
+        _grid = null!;
+        _presetList = null!;
+        _wheelEditor = null!;
         foreach (Transform child in _body) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
         _body.anchoredPosition = Vector2.zero;
         if (tab == 0) General();
         else if (tab == 1) Lobby();
         else Cosmetics();
+        for (var i = 0; i < _tabs.Length; i++)
+            _tabs[i].targetGraphic.color = i == tab ? new Color(0.76f, 1f, 0.88f) : Color.white;
+        StateChanged();
+        _restoreScroll = StartCoroutine(RestoreScroll(tab));
+    }
+
+    private IEnumerator RestoreScroll(int tab)
+    {
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+        if (_tab == tab)
+        {
+            var maximum = Mathf.Max(0, _body.rect.height - _scroll.viewport.rect.height);
+            _body.anchoredPosition = new Vector2(0, Mathf.Clamp(_scrollPositions[ScrollIndex], 0, maximum));
+            _scroll.velocity = Vector2.zero;
+        }
+        _building = false;
+        _restoreScroll = null;
     }
 
     private void General()
@@ -219,6 +306,7 @@ internal sealed class ModWindow : MonoBehaviour
         ToggleRow("Cosmetic chests", () => _plugin.Automation.Cosmetics, v => _plugin.Automation.Cosmetics = v);
         ToggleRow("Emote chests", () => _plugin.Automation.Emotes, v => _plugin.Automation.Emotes = v);
         NativeStyle.Button(_body, "Stop all automation", () => _plugin.Run(_plugin.StopAutomation));
+        AutomationDetails();
     }
 
     private void Lobby()
@@ -242,12 +330,39 @@ internal sealed class ModWindow : MonoBehaviour
             });
         }
         NativeStyle.Button(_body, "Stop all automation", () => _plugin.Run(_plugin.StopAutomation));
+        AutomationDetails();
     }
 
     private void Cosmetics()
     {
         ToggleRow("Share standard appearance in lobby", () => _plugin.Cosmetics.Publish,
             value => _plugin.Cosmetics.SetPublish(value), false);
+        var views = NativeStyle.Row(_body);
+        var names = new[] { "Catalog", "Presets", "Emote wheel" };
+        for (var i = 0; i < names.Length; i++)
+        {
+            var view = i;
+            var button = NativeStyle.Button(views, names[i], () =>
+            {
+                if (!_building) _scrollPositions[ScrollIndex] = Math.Max(0, _body.anchoredPosition.y);
+                _cosmeticView = view;
+                ShowTab(2, false);
+            });
+            button.targetGraphic.color = view == _cosmeticView ? new Color(0.76f, 1f, 0.88f) : Color.white;
+        }
+        _editingWheel = _cosmeticView == 2;
+        if (_editingWheel)
+        {
+            _wheelEditor = NativeStyle.Rect("Wheel editor", _body);
+            NativeStyle.Vertical(_wheelEditor);
+            FillWheelEditor();
+            return;
+        }
+        if (_cosmeticView == 1)
+        {
+            CreatePresets();
+            return;
+        }
         var slots = NativeStyle.Row(_body);
         foreach (var slot in new[] { "skin", "hat", "emote" })
         {
@@ -256,13 +371,27 @@ internal sealed class ModWindow : MonoBehaviour
             {
                 _slot = selectedSlot;
                 _page = 0;
+                _editingWheel = false;
                 FillGrid();
+                StateChanged();
             });
         }
-        _search = NativeStyle.Input(_body, "", "Search cosmetics");
-        _search.onValueChanged.AddListener(_ => { _page = 0; FillGrid(); });
+        _search = NativeStyle.Input(_body, _query, "Search cosmetics");
+        _search.onValueChanged.AddListener(value => { _query = value; _page = 0; FillGrid(); StateChanged(); });
+        var filters = NativeStyle.Row(_body);
+        _favoritesButton = NativeStyle.Button(filters, "", () =>
+        {
+            _favoritesOnly = !_favoritesOnly;
+            _page = 0;
+            FillGrid();
+            StateChanged();
+        });
+        Hint(_favoritesButton.transform, "Show only favorites. Starred items appear first in the full catalog too.");
+        NativeStyle.Button(filters, "Clear search", () => { _search.text = ""; });
         _catalogHint = NativeStyle.Label(_body, "", 32, 12);
         _catalogHint.textWrappingMode = TextWrappingModes.Normal;
+        _emptyState = NativeStyle.Label(_body, "", 48, 14);
+        _emptyState.textWrappingMode = TextWrappingModes.Normal;
         _grid = NativeStyle.Rect("Cosmetic grid", _body);
         var grid = _grid.gameObject.AddComponent<GridLayoutGroup>();
         grid.cellSize = new Vector2(87, 88);
@@ -271,11 +400,11 @@ internal sealed class ModWindow : MonoBehaviour
         grid.constraintCount = 4;
         _grid.gameObject.AddComponent<LayoutElement>().preferredHeight = 282;
         var pages = NativeStyle.Row(_body);
-        NativeStyle.Button(pages, "Previous", () => { if (_page > 0) _page--; FillGrid(); });
+        _previousPage = NativeStyle.Button(pages, "Previous", () => { if (_page > 0) _page--; FillGrid(); StateChanged(); });
         _pageLabel = NativeStyle.Text(pages, "", 13);
         _pageLabel.alignment = TextAlignmentOptions.Center;
         _pageLabel.gameObject.AddComponent<LayoutElement>().preferredWidth = 80;
-        NativeStyle.Button(pages, "Next", () => { _page++; FillGrid(); });
+        _nextPage = NativeStyle.Button(pages, "Next", () => { _page++; FillGrid(); StateChanged(); });
         NativeStyle.Button(_body, "Restore equipped appearance", () => _plugin.Run(() =>
         {
             _plugin.Cosmetics.Restore();
@@ -288,14 +417,27 @@ internal sealed class ModWindow : MonoBehaviour
     private void FillGrid()
     {
         if (!_grid) return;
+        HideTooltip();
+        _favoritesButton.GetComponentInChildren<TMP_Text>().text = _favoritesOnly ? "Favorites only" : "All cosmetics";
+        _favoritesButton.targetGraphic.color = _favoritesOnly ? new Color(1f, 0.88f, 0.58f) : Color.white;
         _catalogHint.text = _slot == "emote"
             ? "Click an emote to send. Use + / - to add or remove it from your wheel."
             : "Click an item to apply and save your appearance.";
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
-        var items = _plugin.Cosmetics.Items(_slot, _search ? _search.text : "").ToList();
+        var items = _plugin.Cosmetics.Items(_slot, _query)
+            .Where(item => !_favoritesOnly || _plugin.Cosmetics.IsFavorite(item.Id))
+            .OrderByDescending(item => _plugin.Cosmetics.IsFavorite(item.Id)).ThenBy(item => item.ItemName).ToList();
         var pages = Math.Max(1, (items.Count + 11) / 12);
         _page = Mathf.Clamp(_page, 0, pages - 1);
         if (_pageLabel) _pageLabel.text = (_page + 1) + " / " + pages;
+        _previousPage.interactable = _page > 0;
+        _nextPage.interactable = _page + 1 < pages;
+        _emptyState.gameObject.SetActive(items.Count == 0);
+        _emptyState.text = _favoritesOnly ? "No favorite items match. Star items in All cosmetics or clear your search."
+            : "No items match your search. Try another name or clear the search.";
+        _grid.gameObject.SetActive(items.Count != 0);
+        _catalogHint.text += "  " + items.Count + " items.";
+        StateChanged();
         foreach (var item in items.Skip(_page * 12).Take(12))
         {
             var cosmetic = item;
@@ -314,6 +456,7 @@ internal sealed class ModWindow : MonoBehaviour
                 }
             }));
             card.gameObject.name = cosmetic.ItemName;
+            Hint(card.transform, cosmetic.ItemName + (cosmetic.IsEmote ? "\nClick to send. + / − changes your wheel." : "\nClick to wear and save."));
             var imageRect = NativeStyle.Rect("Icon", card.transform);
             imageRect.anchorMin = new Vector2(0, 0.26f);
             imageRect.anchorMax = Vector2.one;
@@ -351,7 +494,20 @@ internal sealed class ModWindow : MonoBehaviour
                 rect.pivot = Vector2.one;
                 rect.sizeDelta = new Vector2(26, 24);
                 rect.anchoredPosition = new Vector2(-3, -3);
+                Hint(toggle.transform, _plugin.Wheel.Contains(cosmetic.Id) ? "Remove from your emote wheel" : "Add to your emote wheel");
             }
+            var favorite = NativeStyle.IconButton(card.transform, ControlIcon.Favorite, () => _plugin.Run(() =>
+            {
+                _plugin.Cosmetics.ToggleFavorite(cosmetic.Id);
+                FillGrid();
+            }));
+            var favoriteRect = (RectTransform)favorite.transform;
+            favoriteRect.anchorMin = favoriteRect.anchorMax = new Vector2(0, 1);
+            favoriteRect.pivot = new Vector2(0, 1);
+            favoriteRect.sizeDelta = new Vector2(23, 23);
+            favoriteRect.anchoredPosition = new Vector2(3, -3);
+            favorite.targetGraphic.color = _plugin.Cosmetics.IsFavorite(cosmetic.Id) ? new Color(1f, 0.82f, 0.36f) : Color.white;
+            Hint(favorite.transform, _plugin.Cosmetics.IsFavorite(cosmetic.Id) ? "Remove from favorites" : "Add to favorites");
         }
     }
 
@@ -361,8 +517,11 @@ internal sealed class ModWindow : MonoBehaviour
         var label = NativeStyle.Text(row, title, 14);
         label.alignment = TextAlignmentOptions.MidlineLeft;
         label.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+        Hint(row, title);
         var button = NativeStyle.Button(row, "Off", () => _plugin.Run(() =>
         {
+            if (automation && _plugin.Automation.Error != null)
+                throw new InvalidOperationException("Resume after the error or stop all automation before changing its options.");
             set(!get());
             if (automation) _plugin.SaveAutomation();
         }), 64);
@@ -374,6 +533,7 @@ internal sealed class ModWindow : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_settings != null) SaveState();
         if (_ownsRenderDemand && _renderOwner) _renderOwner.TryPauseRendering();
         if (_canvas) Destroy(_canvas);
         if (_menuButton) Destroy(_menuButton.gameObject);

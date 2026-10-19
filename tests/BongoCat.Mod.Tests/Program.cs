@@ -59,6 +59,7 @@ Check(!policy.NeedsUiReset("friend:skin"), "Sending the next gift consumes the U
 policy.NewLobby();
 Check(policy.Observe("friend:skin", true) && !policy.NeedsUiReset("friend:skin"), "A new lobby clears old requests without resetting an unrelated UI click");
 SettingsTests.Run(Check);
+PolishTests.Run(Check);
 WheelLayoutTests.Run(Check);
 ControlArtTests.Run(Check);
 if (args.Length == 2 && args[0] == "--preview") ControlArtTests.ExportPreview(args[1]);

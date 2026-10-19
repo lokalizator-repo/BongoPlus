@@ -2,7 +2,7 @@ using System;
 
 namespace BongoCatMod;
 
-internal enum ControlIcon { Add, Remove, Previous, Next }
+internal enum ControlIcon { Add, Remove, Previous, Next, Favorite }
 
 internal static class ControlButtonArt
 {
@@ -25,6 +25,19 @@ internal static class ControlButtonArt
                 : Chevron(px, py, icon == ControlIcon.Previous ? -1 : 1, glyph);
             if (icon == ControlIcon.Add)
                 line = Math.Min(line, Segment(px, py, 0, -4 * glyph, 0, 4 * glyph) - 0.9 * glyph);
+            if (icon == ControlIcon.Favorite)
+            {
+                line = double.PositiveInfinity;
+                for (var point = 0; point < 10; point++)
+                {
+                    var angle = Math.PI / 2 + point * Math.PI / 5;
+                    var next = angle + Math.PI / 5;
+                    var radiusA = (point % 2 == 0 ? 6 : 2.8) * glyph;
+                    var radiusB = (point % 2 == 0 ? 2.8 : 6) * glyph;
+                    line = Math.Min(line, Segment(px, py, Math.Cos(angle) * radiusA, Math.Sin(angle) * radiusA,
+                        Math.Cos(next) * radiusB, Math.Sin(next) * radiusB) - 0.7 * glyph);
+                }
+            }
             var ink = Coverage(line);
             var alpha = ink + outer * (1 - ink);
             if (alpha <= 0) continue;

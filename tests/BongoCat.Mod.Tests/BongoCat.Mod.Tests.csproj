@@ -9,6 +9,9 @@
     <Compile Include="../../src/BongoCat.Mod/BalanceMath.cs" Link="BalanceMath.cs" />
     <Compile Include="../../src/BongoCat.Mod/AutomationPolicy.cs" Link="AutomationPolicy.cs" />
     <Compile Include="../../src/BongoCat.Mod/ModSettings.cs" Link="ModSettings.cs" />
+    <Compile Include="../../src/BongoCat.Mod/CosmeticPreferences.cs" Link="CosmeticPreferences.cs" />
+    <Compile Include="../../src/BongoCat.Mod/MenuLayout.cs" Link="MenuLayout.cs" />
+    <Compile Include="../../src/BongoCat.Mod/AutomationActivity.cs" Link="AutomationActivity.cs" />
     <Compile Include="../../src/BongoCat.Mod/WheelLayout.cs" Link="WheelLayout.cs" />
     <Compile Include="../../src/BongoCat.Mod/ControlButtonArt.cs" Link="ControlButtonArt.cs" />
     <Reference Include="BepInEx"><HintPath>../../vendor/BepInEx-5.4.23.5/BepInEx/core/BepInEx.dll</HintPath></Reference>

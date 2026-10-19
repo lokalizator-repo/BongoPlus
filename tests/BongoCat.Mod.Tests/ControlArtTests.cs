@@ -48,7 +48,9 @@ internal static class ControlArtTests
 
     internal static void ExportPreview(string path)
     {
-        const int width = 528, height = 224;
+        var icons = Enum.GetValues<ControlIcon>();
+        var width = icons.Length * 128 + 16;
+        const int height = 224;
         var canvas = new byte[width * height * 4];
         for (var i = 0; i < width * height; i++)
         {
@@ -57,7 +59,6 @@ internal static class ControlArtTests
             canvas[i * 4 + 2] = 60;
             canvas[i * 4 + 3] = 255;
         }
-        var icons = Enum.GetValues<ControlIcon>();
         for (var i = 0; i < icons.Length; i++)
         {
             var art = ControlButtonArt.Render(icons[i], 28, 28);

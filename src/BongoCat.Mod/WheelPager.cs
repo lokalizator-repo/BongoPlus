@@ -71,7 +71,7 @@ internal sealed class WheelPager : MonoBehaviour
             entry.anchoredPosition = Vector2.zero;
             _wrappers.Add(pair.Key, wrapper);
         }
-        _ids = entries.Keys.ToArray();
+        _ids = Plugin.Instance?.Wheel?.OrderIds(entries.Keys) ?? entries.Keys.ToArray();
         _page = Math.Min(_page, WheelLayout.PageCount(_ids.Length) - 1);
         _dirty = true;
         Reflow();
