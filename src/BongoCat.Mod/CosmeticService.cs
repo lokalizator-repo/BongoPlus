@@ -12,17 +12,26 @@ internal sealed class CosmeticService
 {
     private readonly Dictionary<string, int> _selected = new Dictionary<string, int>();
     private readonly ManualLogSource _log;
+    private readonly ModSettings _settings;
+    private bool _restorePending = true;
     private float _nextRefresh;
     private bool _dirty;
     public bool Publish { get; private set; } = true;
     public string Status { get; private set; } = "Using your normal equipped cosmetics.";
 
-    public CosmeticService(ManualLogSource log) => _log = log;
+    public CosmeticService(ManualLogSource log, ModSettings settings)
+    {
+        _log = log;
+        _settings = settings;
+        Publish = settings.ShareAppearance.Value;
+    }
 
     public void SetPublish(bool value)
     {
         if (Publish == value) return;
         Publish = value;
+        _settings.ShareAppearance.Value = value;
+        _settings.Save();
         if (!value) RestorePublished();
         Apply();
     }
@@ -37,6 +46,8 @@ internal sealed class CosmeticService
     {
         if (!Cat.Instance) throw new InvalidOperationException("Wait for your cat to load.");
         _selected[item.ItemSlot] = item.Id;
+        _settings.Appearance[item.ItemSlot].Value = item.Id;
+        _settings.Save();
         _dirty = true;
         Apply();
     }
@@ -53,6 +64,26 @@ internal sealed class CosmeticService
     public void Apply(bool force = false)
     {
         if (!Cat.Instance || !SteamItemIdReference.Inst) return;
+        if (_restorePending)
+        {
+            if (!CatInventory.Instance || !CatInventory.Instance.IsInitialized) return;
+            foreach (var entry in _settings.Appearance.Values)
+                if (SteamItemIdReference.Inst.Ids.Contains(entry.Value) && !SteamItemIdReference.Inst[entry.Value].Icon)
+                    return;
+            foreach (var pair in _settings.Appearance)
+            {
+                var id = pair.Value.Value;
+                if (id == -1 || _selected.ContainsKey(pair.Key)) continue;
+                if (!SteamItemIdReference.Inst.Ids.Contains(id) || SteamItemIdReference.Inst[id].ItemSlot != pair.Key)
+                {
+                    _log.LogWarning("Ignoring saved cosmetic: slot=" + pair.Key + ", item=" + id + ".");
+                    continue;
+                }
+                _selected[pair.Key] = id;
+            }
+            _restorePending = false;
+            _dirty = true;
+        }
         if (_selected.Count == 0) return;
         var lobby = LobbyData.Current;
         var synchronized = Publish && lobby.IsValid;
@@ -83,6 +114,9 @@ internal sealed class CosmeticService
     {
         if (!Cat.Instance || !CatCosmetics.Instance) return;
         _selected.Clear();
+        _restorePending = false;
+        foreach (var entry in _settings.Appearance.Values) entry.Value = -1;
+        _settings.Save();
         RestorePublished();
         foreach (var slot in ItemSlots.Cosmetics) Cat.Instance.ClearItemSlot(slot);
         foreach (var item in CatCosmetics.Instance.EquippedItems) Cat.Instance.SetItem(item, false);

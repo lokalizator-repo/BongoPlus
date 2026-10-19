@@ -40,10 +40,16 @@ internal sealed class AutomationService
     public readonly HashSet<ulong> SelectedPlayers = new HashSet<ulong>();
     public string Status { get; private set; } = "Automation is off.";
 
-    public AutomationService(ManualLogSource log, BalanceService balance)
+    public AutomationService(ManualLogSource log, BalanceService balance, ModSettings settings)
     {
         _log = log;
         _balance = balance;
+        BuyOwn = settings.BuyOwn.Value;
+        Gift = settings.Gift.Value;
+        Cosmetics = settings.CosmeticChests.Value;
+        Emotes = settings.EmoteChests.Value;
+        AllPlayers = settings.AllPlayers.Value;
+        SelectedPlayers.UnionWith(settings.ReadRecipients());
     }
 
     public void Stop(string reason = "Automation stopped.")
@@ -69,8 +75,6 @@ internal sealed class AutomationService
             _sentAt.Clear();
             _chestViews = Array.Empty<OpenChestForMember>();
             _nextViewRefresh = 0;
-            SelectedPlayers.Clear();
-            Gift = false;
         }
         if ((!BuyOwn && !Gift) || !GameAccess.Ready || _balance.Pending) return;
         if (!_balance.Healthy) { Stop("Steam stats save failed. Reload stats before using automation."); return; }

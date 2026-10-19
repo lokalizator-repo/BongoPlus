@@ -130,6 +130,15 @@ internal sealed class ModWindow : MonoBehaviour
     {
         if (!_canvas) return;
         if (Input.GetKeyDown(KeyCode.F9)) Toggle();
+        else if (_panel.gameObject.activeSelf)
+        {
+            var outside = !RectTransformUtility.RectangleContainsScreenPoint(_panel, Input.mousePosition, null);
+            var onMenuButton = _menuButton && RectTransformUtility.RectangleContainsScreenPoint(
+                (RectTransform)_menuButton.transform, Input.mousePosition, null);
+            if (Input.GetKeyDown(KeyCode.Escape) ||
+                ((Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) && outside && !onMenuButton))
+                SetVisible(false);
+        }
         if (!_panel.gameObject.activeSelf || Time.realtimeSinceStartup < _nextRefresh) return;
         _nextRefresh = Time.realtimeSinceStartup + 0.5f;
         if (_balance) _balance.text = "Available points: " + GameAccess.Balance.ToString("N0", CultureInfo.InvariantCulture);
@@ -141,9 +150,11 @@ internal sealed class ModWindow : MonoBehaviour
         _status.text = _error ?? (_tab == 2 ? _plugin.Cosmetics.Status : _plugin.Automation.Status);
     }
 
-    public void Toggle()
+    public void Toggle() => SetVisible(!_panel.gameObject.activeSelf);
+
+    private void SetVisible(bool show)
     {
-        var show = !_panel.gameObject.activeSelf;
+        if (!_panel || _panel.gameObject.activeSelf == show) return;
         _panel.gameObject.SetActive(show);
         _renderOwner = OnDemandRenderHelper.Instance;
         if (_renderOwner)
@@ -151,6 +162,11 @@ internal sealed class ModWindow : MonoBehaviour
             if (show && !_ownsRenderDemand) { _renderOwner.ResumeRendering(); _ownsRenderDemand = true; }
             else if (!show && _ownsRenderDemand) { _renderOwner.TryPauseRendering(); _ownsRenderDemand = false; }
         }
+    }
+
+    private void OnApplicationFocus(bool focused)
+    {
+        if (!focused) SetVisible(false);
     }
 
     public void ShowError(string message) => _error = message;
@@ -181,13 +197,13 @@ internal sealed class ModWindow : MonoBehaviour
         {
             if (!int.TryParse(input.text, out var target) || target < 0 || target > BalanceMath.Maximum)
                 throw new ArgumentException("Enter a balance from 0 to 2,147,483,646.");
-            _plugin.Automation.Stop();
+            _plugin.StopAutomation();
             _plugin.Balance.Set(target);
             _error = null;
         }));
         _restoreBalance = NativeStyle.Button(actions, "Restore balance", () => _plugin.Run(() =>
         {
-            _plugin.Automation.Stop();
+            _plugin.StopAutomation();
             _plugin.Balance.Restore();
             _error = null;
         }));
@@ -197,7 +213,7 @@ internal sealed class ModWindow : MonoBehaviour
         ToggleRow("Buy my ready chests", () => _plugin.Automation.BuyOwn, v => _plugin.Automation.BuyOwn = v);
         ToggleRow("Cosmetic chests", () => _plugin.Automation.Cosmetics, v => _plugin.Automation.Cosmetics = v);
         ToggleRow("Emote chests", () => _plugin.Automation.Emotes, v => _plugin.Automation.Emotes = v);
-        NativeStyle.Button(_body, "Stop all automation", () => _plugin.Automation.Stop());
+        NativeStyle.Button(_body, "Stop all automation", () => _plugin.Run(_plugin.StopAutomation));
     }
 
     private void Lobby()
@@ -220,13 +236,13 @@ internal sealed class ModWindow : MonoBehaviour
                 else _plugin.Automation.SelectedPlayers.Remove(id);
             });
         }
-        NativeStyle.Button(_body, "Stop all automation", () => _plugin.Automation.Stop());
+        NativeStyle.Button(_body, "Stop all automation", () => _plugin.Run(_plugin.StopAutomation));
     }
 
     private void Cosmetics()
     {
         ToggleRow("Share standard appearance in lobby", () => _plugin.Cosmetics.Publish,
-            value => _plugin.Cosmetics.SetPublish(value));
+            value => _plugin.Cosmetics.SetPublish(value), false);
         var slots = NativeStyle.Row(_body);
         foreach (var slot in new[] { "skin", "hat", "bongos" })
         {
@@ -254,7 +270,7 @@ internal sealed class ModWindow : MonoBehaviour
         _pageLabel.gameObject.AddComponent<LayoutElement>().preferredWidth = 80;
         NativeStyle.Button(pages, "Next", () => { _page++; FillGrid(); });
         NativeStyle.Button(_body, "Restore equipped appearance", () => _plugin.Run(_plugin.Cosmetics.Restore));
-        NativeStyle.Label(_body, "Lobby visibility needs a second-client test. Steam inventory is unchanged.", 42, 12).textWrappingMode = TextWrappingModes.Normal;
+        NativeStyle.Label(_body, "Appearance is saved between launches. Steam inventory is unchanged.", 42, 12).textWrappingMode = TextWrappingModes.Normal;
         FillGrid();
     }
 
@@ -285,13 +301,17 @@ internal sealed class ModWindow : MonoBehaviour
         }
     }
 
-    private void ToggleRow(string title, Func<bool> get, Action<bool> set)
+    private void ToggleRow(string title, Func<bool> get, Action<bool> set, bool automation = true)
     {
         var row = NativeStyle.Row(_body);
         var label = NativeStyle.Text(row, title, 14);
         label.alignment = TextAlignmentOptions.MidlineLeft;
         label.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
-        var button = NativeStyle.Button(row, "Off", () => _plugin.Run(() => set(!get())), 64);
+        var button = NativeStyle.Button(row, "Off", () => _plugin.Run(() =>
+        {
+            set(!get());
+            if (automation) _plugin.SaveAutomation();
+        }), 64);
         var state = button.GetComponentInChildren<TMP_Text>();
         void Refresh() => state.text = get() ? "On" : "Off";
         _refreshers.Add(Refresh);

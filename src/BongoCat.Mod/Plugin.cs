@@ -15,12 +15,13 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.1.5";
+    public const string Version = "0.1.6";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
     internal AutomationService Automation = null!;
     internal CosmeticService Cosmetics = null!;
+    private ModSettings _settings = null!;
     private Harmony? _harmony;
     private ModWindow _window = null!;
     private bool _failed;
@@ -38,12 +39,13 @@ public sealed class Plugin : BaseUnityPlugin
             if (actual != ExpectedAssembly)
                 throw new InvalidOperationException("Game build changed. This plugin requires a compatibility update.");
 
+            _settings = new ModSettings(Config);
             Balance = new BalanceService(Logger);
-            Automation = new AutomationService(Logger, Balance);
-            Cosmetics = new CosmeticService(Logger);
+            Automation = new AutomationService(Logger, Balance, _settings);
+            Cosmetics = new CosmeticService(Logger, _settings);
             _harmony = new Harmony(Id);
             _harmony.PatchAll(typeof(Plugin).Assembly);
-            Logger.LogInfo("Bongo Cat Mods " + Version + " loaded. Build verified; all automation starts off.");
+            Logger.LogInfo("Bongo Cat Mods " + Version + " loaded. Build verified; saved preferences restored.");
         }
         catch (Exception error)
         {
@@ -87,6 +89,23 @@ public sealed class Plugin : BaseUnityPlugin
             Logger.LogWarning(error);
             if (_window) _window.ShowError(error.GetBaseException().Message);
         }
+    }
+
+    internal void SaveAutomation()
+    {
+        _settings.BuyOwn.Value = Automation.BuyOwn;
+        _settings.Gift.Value = Automation.Gift;
+        _settings.CosmeticChests.Value = Automation.Cosmetics;
+        _settings.EmoteChests.Value = Automation.Emotes;
+        _settings.AllPlayers.Value = Automation.AllPlayers;
+        _settings.SetRecipients(Automation.SelectedPlayers);
+        _settings.Save();
+    }
+
+    internal void StopAutomation()
+    {
+        Automation.Stop();
+        SaveAutomation();
     }
 
     private void OnDestroy()
