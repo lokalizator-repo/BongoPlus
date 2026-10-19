@@ -15,6 +15,7 @@ internal sealed class ModSettings
     public readonly ConfigEntry<bool> AllPlayers;
     public readonly ConfigEntry<string> Recipients;
     public readonly ConfigEntry<bool> ShareAppearance;
+    public readonly ConfigEntry<string> WheelEmotes;
     public readonly Dictionary<string, ConfigEntry<int>> Appearance = new Dictionary<string, ConfigEntry<int>>();
 
     public ModSettings(ConfigFile config)
@@ -28,6 +29,7 @@ internal sealed class ModSettings
         AllPlayers = config.Bind("Automation", "AllPlayers", false);
         Recipients = config.Bind("Automation", "Recipients", "");
         ShareAppearance = config.Bind("Appearance", "ShareInLobby", true);
+        WheelEmotes = config.Bind("Emotes", "WheelItems", "");
         foreach (var slot in new[] { "skin", "hat", "bongos" })
             Appearance.Add(slot, config.Bind("Appearance", slot, -1));
     }
@@ -46,4 +48,17 @@ internal sealed class ModSettings
             .Select(id => id.ToString(CultureInfo.InvariantCulture)));
 
     public void Save() => _config.Save();
+
+    public HashSet<int> ReadWheelEmotes()
+    {
+        var result = new HashSet<int>();
+        foreach (var value in WheelEmotes.Value.Split(','))
+            if (int.TryParse(value.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0)
+                result.Add(id);
+        return result;
+    }
+
+    public void SetWheelEmotes(IEnumerable<int> emotes) => WheelEmotes.Value = string.Join(",",
+        emotes.Where(id => id > 0).Distinct().OrderBy(id => id)
+            .Select(id => id.ToString(CultureInfo.InvariantCulture)));
 }

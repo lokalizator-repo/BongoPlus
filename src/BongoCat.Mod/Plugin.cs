@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -15,12 +16,13 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.1.7";
+    public const string Version = "0.1.8";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
     internal AutomationService Automation = null!;
     internal CosmeticService Cosmetics = null!;
+    internal EmoteWheelService Wheel = null!;
     private ModSettings _settings = null!;
     private Harmony? _harmony;
     private ModWindow _window = null!;
@@ -43,6 +45,7 @@ public sealed class Plugin : BaseUnityPlugin
             Balance = new BalanceService(Logger);
             Automation = new AutomationService(Logger, Balance, _settings);
             Cosmetics = new CosmeticService(Logger, _settings);
+            Wheel = new EmoteWheelService(_settings, Logger);
             _harmony = new Harmony(Id);
             _harmony.PatchAll(typeof(Plugin).Assembly);
             Logger.LogInfo("Bongo Cat Mods " + Version + " loaded. Build verified; saved preferences restored.");
@@ -72,6 +75,7 @@ public sealed class Plugin : BaseUnityPlugin
             Balance.Tick();
             Automation.Tick();
             Cosmetics.Tick();
+            Wheel.Tick();
         }
         catch (Exception error)
         {
@@ -122,6 +126,55 @@ public sealed class Plugin : BaseUnityPlugin
     private static class PurchaseFinished
     {
         private static void Postfix(ShopItem __instance, int itemId) => Instance?.Automation?.OnPurchaseFinished(__instance, itemId);
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), "Start")]
+    private static class WheelStarted
+    {
+        private static void Postfix(EmoteDonut __instance, ref IEnumerator __result) =>
+            __result = WaitForStart(__instance, __result);
+
+        private static IEnumerator WaitForStart(EmoteDonut wheel, IEnumerator routine)
+        {
+            try
+            {
+                while (routine.MoveNext()) yield return routine.Current;
+            }
+            finally
+            {
+                (routine as IDisposable)?.Dispose();
+            }
+            Instance?.Wheel?.OnReady(wheel);
+        }
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), nameof(EmoteDonut.Validate))]
+    private static class WheelValidated
+    {
+        private static void Prefix() => Instance?.Wheel?.BeginValidation();
+
+        private static Exception? Finalizer(Exception? __exception)
+        {
+            Instance?.Wheel?.EndValidation();
+            return __exception;
+        }
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), "RemoveEmote")]
+    private static class WheelEmoteRemoved
+    {
+        private static bool Prefix(SteamItemRuntime steamItem) =>
+            !(Instance?.Wheel?.KeepDuringValidation(steamItem) ?? false);
+    }
+
+    [HarmonyPatch(typeof(EmoteDonut), nameof(EmoteDonut.ToggleItem))]
+    private static class WheelEmoteToggled
+    {
+        private static void Prefix(EmoteDonut __instance, SteamItemRuntime steamItem, out bool __state) =>
+            __state = Instance?.Wheel?.Contains(__instance, steamItem.Id) ?? false;
+
+        private static void Postfix(SteamItemRuntime steamItem, bool __state) =>
+            Instance?.Wheel?.ObserveToggle(steamItem, __state);
     }
 
     [HarmonyPatch]

@@ -26,6 +26,8 @@ internal sealed class ModWindow : MonoBehaviour
     private TextMeshProUGUI _pageLabel = null!;
     private TMP_InputField _search = null!;
     private TextMeshProUGUI _catalogHint = null!;
+    private RectTransform _wheelControls = null!;
+    private bool _editWheel;
     private Button _menuButton = null!;
     private string _slot = "skin";
     private int _page;
@@ -149,7 +151,7 @@ internal sealed class ModWindow : MonoBehaviour
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
         _status.text = _error ?? (_tab == 2
-            ? (_slot == "emote" ? _plugin.Cosmetics.EmoteStatus : _plugin.Cosmetics.Status)
+            ? (_slot == "emote" ? (_editWheel ? _plugin.Wheel.Status : _plugin.Cosmetics.EmoteStatus) : _plugin.Cosmetics.Status)
             : _plugin.Automation.Status);
     }
 
@@ -159,6 +161,7 @@ internal sealed class ModWindow : MonoBehaviour
     {
         if (!_panel || _panel.gameObject.activeSelf == show) return;
         _panel.gameObject.SetActive(show);
+        if (show && _tab == 2 && _slot == "emote") FillGrid();
         _renderOwner = OnDemandRenderHelper.Instance;
         if (_renderOwner)
         {
@@ -261,6 +264,9 @@ internal sealed class ModWindow : MonoBehaviour
         _search.onValueChanged.AddListener(_ => { _page = 0; FillGrid(); });
         _catalogHint = NativeStyle.Label(_body, "", 32, 12);
         _catalogHint.textWrappingMode = TextWrappingModes.Normal;
+        _wheelControls = NativeStyle.Row(_body);
+        NativeStyle.Button(_wheelControls, "Send on click", () => { _editWheel = false; _error = null; FillGrid(); });
+        NativeStyle.Button(_wheelControls, "Add/remove on click", () => { _editWheel = true; _error = null; FillGrid(); });
         _grid = NativeStyle.Rect("Cosmetic grid", _body);
         var grid = _grid.gameObject.AddComponent<GridLayoutGroup>();
         grid.cellSize = new Vector2(87, 88);
@@ -282,7 +288,10 @@ internal sealed class ModWindow : MonoBehaviour
     private void FillGrid()
     {
         if (!_grid) return;
-        _catalogHint.text = _slot == "emote" ? "Click a standard emote to send it to your current lobby."
+        _wheelControls.gameObject.SetActive(_slot == "emote");
+        _catalogHint.text = _slot == "emote"
+            ? (_editWheel ? "Click to add/remove an emote. [Wheel] marks current wheel entries."
+                : "Click to send an emote. Switch to Add/remove to edit your wheel.")
             : _slot == "bongos" ? "Bongos are the instruments in front of your cat's paws."
             : "Click an item to apply and save your appearance.";
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
@@ -295,7 +304,13 @@ internal sealed class ModWindow : MonoBehaviour
             var cosmetic = item;
             var card = NativeStyle.Button(_grid, "", () => _plugin.Run(() =>
             {
-                if (cosmetic.IsEmote) _plugin.Cosmetics.SendEmote(cosmetic);
+                _error = null;
+                if (cosmetic.IsEmote && _editWheel)
+                {
+                    _plugin.Wheel.Toggle(cosmetic);
+                    FillGrid();
+                }
+                else if (cosmetic.IsEmote) _plugin.Cosmetics.SendEmote(cosmetic);
                 else _plugin.Cosmetics.Select(cosmetic);
             }));
             var imageRect = NativeStyle.Rect("Icon", card.transform);
@@ -307,7 +322,7 @@ internal sealed class ModWindow : MonoBehaviour
             image.preserveAspect = true;
             image.raycastTarget = false;
             var label = card.GetComponentInChildren<TMP_Text>();
-            label.text = cosmetic.ItemName;
+            label.text = (cosmetic.IsEmote && _plugin.Wheel.Contains(cosmetic.Id) ? "[Wheel] " : "") + cosmetic.ItemName;
             label.fontSize = 10;
             label.rectTransform.anchorMax = new Vector2(1, 0.25f);
         }
