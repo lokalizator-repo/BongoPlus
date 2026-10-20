@@ -2,13 +2,14 @@ using System;
 
 namespace BongoCatMod;
 
-internal enum ControlIcon { Add, Remove, Previous, Next, Favorite, Catalog, Presets, Wheel, Skin, Hat, Emote, Share, Reset, Close, Save, Trash, Settings, Lobby, Palette }
+internal enum ControlIcon { Add, Remove, Previous, Next, Favorite, Catalog, Presets, Wheel, Skin, Hat, Emote, Share, Reset, Close, Save, Trash, Settings, Lobby, Palette, Mods }
 
 internal static class ControlButtonArt
 {
     public const int Resolution = 4;
     private static readonly System.Collections.Generic.Dictionary<ControlIcon, double[][]> Paths = new System.Collections.Generic.Dictionary<ControlIcon, double[][]>
     {
+        [ControlIcon.Mods] = new[] { new double[] { -6,-6,0,-6,0,-4,1,-3,2,-4,2,-6,6,-6,6,-1,4,-1,3,0,4,2,6,2,6,6,1,6,1,8,-1,9,-3,8,-3,6,-6,6,-6,2,-4,2,-3,0,-4,-1,-6,-1,-6,-6 } },
         [ControlIcon.Catalog] = new[] { new double[] { -6,-6,-1,-6,-1,-1,-6,-1,-6,-6 }, new double[] { 2,-6,7,-6,7,-1,2,-1,2,-6 }, new double[] { -6,2,-1,2,-1,7,-6,7,-6,2 }, new double[] { 2,2,7,2,7,7,2,7,2,2 } },
         [ControlIcon.Presets] = new[] { new double[] { -6,-6,3,-6,3,3,-6,3,-6,-6 }, new double[] { -3,6,6,6,6,-3 } },
         [ControlIcon.Skin] = new[] { new double[] { -7,-3,-7,7,-2,4,2,4,7,7,7,-3,4,-6,-4,-6,-7,-3 }, new double[] { -3,0,-3,-1 }, new double[] { 3,0,3,-1 }, new double[] { -2,-3,0,-4,2,-3 } },

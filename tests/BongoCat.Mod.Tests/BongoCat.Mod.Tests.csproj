@@ -15,5 +15,7 @@
     <Compile Include="../../src/BongoCat.Mod/WheelLayout.cs" Link="WheelLayout.cs" />
     <Compile Include="../../src/BongoCat.Mod/ControlButtonArt.cs" Link="ControlButtonArt.cs" />
     <Reference Include="BepInEx"><HintPath>../../vendor/BepInEx-5.4.23.5/BepInEx/core/BepInEx.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/UnityEngine.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

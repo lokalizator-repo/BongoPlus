@@ -16,7 +16,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.2.1";
+    public const string Version = "0.2.2";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -81,7 +81,7 @@ public sealed class Plugin : BaseUnityPlugin
                 {
                     _window = gameObject.AddComponent<ModWindow>();
                     _window.Initialize(this);
-                    Logger.LogInfo("Native mod window created. Press F9 to open.");
+                    Logger.LogInfo("Native mod window created. Open it from Mods in the game menu.");
                 }
             }
             Balance.Tick();

@@ -161,7 +161,7 @@ internal sealed partial class ModWindow : MonoBehaviour
             }
         });
 
-        _status = NativeStyle.Text(_panel, "F9 to toggle • v" + Plugin.Version, 12);
+        _status = NativeStyle.Text(_panel, "v" + Plugin.Version, 12);
         _status.rectTransform.anchorMin = Vector2.zero;
         _status.rectTransform.anchorMax = new Vector2(1, 0);
         NativeStyle.Offsets(_status.rectTransform, new Vector2(18, 10), new Vector2(-18, 48));
@@ -185,15 +185,19 @@ internal sealed partial class ModWindow : MonoBehaviour
         var menus = Resources.FindObjectsOfTypeAll<MenuTabs>();
         var menu = menus.FirstOrDefault(m => m.gameObject.scene.IsValid());
         if (!menu) return;
-        var button = NativeStyle.Button(menu.transform, "Mods", Toggle);
+        var button = NativeStyle.NavButton(menu.transform, "Mods", ControlIcon.Mods, Toggle);
         _menuButton = button;
         var rect = (RectTransform)button.transform;
-        rect.anchorMin = new Vector2(0, 1);
-        rect.anchorMax = new Vector2(1, 1);
-        rect.pivot = new Vector2(0.5f, 0);
-        rect.anchoredPosition = new Vector2(0, 8);
-        rect.sizeDelta = new Vector2(0, 34);
+        rect.anchorMin = rect.anchorMax = new Vector2(1, 1);
+        rect.pivot = new Vector2(1, 0);
+        rect.anchoredPosition = new Vector2(-4, 4);
+        rect.sizeDelta = new Vector2(88, 28);
         rect.gameObject.GetComponent<LayoutElement>().ignoreLayout = true;
+        var label = button.GetComponentInChildren<TMP_Text>();
+        label.fontSize = 13;
+        Destroy(label.GetComponent<ModTextTheme>());
+        button.gameObject.AddComponent<NativeMenuButton>().Initialize(button.transform.Find("Icon").GetComponent<Graphic>(), label);
+        Hint(button.transform, "Open Mods");
     }
 
     private void Update()
@@ -202,13 +206,16 @@ internal sealed partial class ModWindow : MonoBehaviour
         FitWindow();
         UpdateTooltip();
         if (_stateDirty && Time.realtimeSinceStartup >= _saveAt) SaveState();
-        if (Input.GetKeyDown(KeyCode.F9)) Toggle();
+        var captured = _capturingShortcut;
+        if (captured) CaptureShortcut();
+        if (!captured && _settings.ToggleShortcut.Value.MainKey != KeyCode.None &&
+            !Helper.InputFieldCache.FocusingInputField && _settings.ToggleShortcut.Value.IsDown()) Toggle();
         else if (_panel.gameObject.activeSelf)
         {
             var outside = !RectTransformUtility.RectangleContainsScreenPoint(_panel, Input.mousePosition, null);
             var onMenuButton = _menuButton && RectTransformUtility.RectangleContainsScreenPoint(
                 (RectTransform)_menuButton.transform, Input.mousePosition, null);
-            if (Input.GetKeyDown(KeyCode.Escape) ||
+            if ((!captured && Input.GetKeyDown(KeyCode.Escape)) ||
                 ((Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) && outside && !onMenuButton))
                 SetVisible(false);
         }
@@ -232,7 +239,9 @@ internal sealed partial class ModWindow : MonoBehaviour
     {
         if (!_panel || _panel.gameObject.activeSelf == show) return;
         if (!show) { HideTooltip(); SaveState(); }
+        if (!show) _capturingShortcut = false;
         _panel.gameObject.SetActive(show);
+        if (_menuButton) _menuButton.GetComponent<NativeMenuButton>().SetOpen(show);
         if (show && _tab == 2) FillGrid();
         _renderOwner = OnDemandRenderHelper.Instance;
         if (_renderOwner)
@@ -254,6 +263,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         if (capture && !_building) _scrollPositions[ScrollIndex] = Math.Max(0, _body.anchoredPosition.y);
         if (_restoreScroll != null) StopCoroutine(_restoreScroll);
         _building = true;
+        _capturingShortcut = false;
         HideTooltip();
         _tab = tab;
         _error = null;
@@ -292,6 +302,7 @@ internal sealed partial class ModWindow : MonoBehaviour
 
     private void General()
     {
+        ShortcutSettings();
         _balance = NativeStyle.Label(_body, "Available points", 28, 19);
         var input = NativeStyle.Input(_body, GameAccess.Balance.ToString(CultureInfo.InvariantCulture), "Target balance");
         input.contentType = TMP_InputField.ContentType.IntegerNumber;

@@ -26,6 +26,7 @@ internal sealed class ModSettings
     public readonly ConfigEntry<int> CosmeticView;
     public readonly ConfigEntry<bool> FavoritesOnly;
     public readonly ConfigEntry<string> MenuScroll;
+    public readonly ConfigEntry<KeyboardShortcut> ToggleShortcut;
     public readonly Dictionary<string, ConfigEntry<int>> Appearance = new Dictionary<string, ConfigEntry<int>>();
 
     public ModSettings(ConfigFile config)
@@ -50,6 +51,7 @@ internal sealed class ModSettings
         CosmeticView = config.Bind("Menu", "CosmeticView", 0);
         FavoritesOnly = config.Bind("Menu", "FavoritesOnly", false);
         MenuScroll = config.Bind("Menu", "Scroll", "0,0,0");
+        ToggleShortcut = config.Bind("Input", "ToggleWindow", KeyboardShortcut.Empty);
         foreach (var slot in new[] { "skin", "hat" })
             Appearance.Add(slot, config.Bind("Appearance", slot, -1));
         var obsolete = config.Bind("Appearance", "bongos", -1);
