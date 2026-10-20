@@ -210,8 +210,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         if (_stateDirty && Time.realtimeSinceStartup >= _saveAt) SaveState();
         var captured = _capturingShortcut;
         if (captured) CaptureShortcut();
-        if (!captured && _settings.ToggleShortcut.Value.MainKey != KeyCode.None &&
-            !Helper.InputFieldCache.FocusingInputField && _settings.ToggleShortcut.Value.IsDown()) Toggle();
+        if (!captured && _plugin.Available(Feature.Input) && _settings.ToggleShortcut.Value.MainKey != KeyCode.None && ShortcutPressed()) Toggle();
         else if (_panel.gameObject.activeSelf)
         {
             var outside = !RectTransformUtility.RectangleContainsScreenPoint(_panel, Input.mousePosition, null);
@@ -224,10 +223,10 @@ internal sealed partial class ModWindow : MonoBehaviour
         if (!_panel.gameObject.activeSelf || Time.realtimeSinceStartup < _nextRefresh) return;
         _nextRefresh = Time.realtimeSinceStartup + 0.5f;
         if (_balance) _balance.text = "Available points: " + GameAccess.Balance.ToString("N0", CultureInfo.InvariantCulture);
-        if (_detail) _detail.text = _plugin.Balance.Status +
+        if (_detail && _plugin.Available(Feature.Balance)) _detail.text = _plugin.Balance.Status +
             "\nMax balance: " + Math.Max(0, BalanceMath.Maximum - (int)GameAccess.Spent.GetValue(Pets.Instance)).ToString("N0");
-        if (_applyBalance) _applyBalance.interactable = GameAccess.Ready && !_plugin.Balance.Pending;
-        if (_restoreBalance) _restoreBalance.interactable = _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
+        if (_applyBalance) _applyBalance.interactable = _plugin.Available(Feature.Balance) && GameAccess.Ready && !_plugin.Balance.Pending;
+        if (_restoreBalance) _restoreBalance.interactable = _plugin.Available(Feature.Balance) && _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
         if (_tab == 2 && _editingWheel && _wheelSignature != string.Join(",", _plugin.Wheel.ItemIds)) FillWheelEditor();
         _status.text = _error ?? (_tab == 2
@@ -305,6 +304,21 @@ internal sealed partial class ModWindow : MonoBehaviour
     private void General()
     {
         ShortcutSettings();
+        if (FeatureNotice(Feature.Balance)) BalanceControls();
+        if (FeatureNotice(Feature.Automation))
+        {
+            NativeStyle.Label(_body, "CHEST AUTOMATION", 25, 17);
+            ToggleRow("Buy my ready chests", () => _plugin.Automation.BuyOwn, v => _plugin.Automation.BuyOwn = v);
+            ToggleRow("Cosmetic chests", () => _plugin.Automation.Cosmetics, v => _plugin.Automation.Cosmetics = v);
+            ToggleRow("Emote chests", () => _plugin.Automation.Emotes, v => _plugin.Automation.Emotes = v);
+            NativeStyle.Button(_body, "Stop all automation", () => _plugin.Run(_plugin.StopAutomation));
+            AutomationDetails();
+        }
+        CompatibilityDetails();
+    }
+
+    private void BalanceControls()
+    {
         _balance = NativeStyle.Label(_body, "Available points", 28, 19);
         var input = NativeStyle.Input(_body, GameAccess.Balance.ToString(CultureInfo.InvariantCulture), "Target balance");
         input.contentType = TMP_InputField.ContentType.IntegerNumber;
@@ -325,16 +339,11 @@ internal sealed partial class ModWindow : MonoBehaviour
         }));
         _detail = NativeStyle.Label(_body, "", 54, 12);
         _detail.textWrappingMode = TextWrappingModes.Normal;
-        NativeStyle.Label(_body, "CHEST AUTOMATION", 25, 17);
-        ToggleRow("Buy my ready chests", () => _plugin.Automation.BuyOwn, v => _plugin.Automation.BuyOwn = v);
-        ToggleRow("Cosmetic chests", () => _plugin.Automation.Cosmetics, v => _plugin.Automation.Cosmetics = v);
-        ToggleRow("Emote chests", () => _plugin.Automation.Emotes, v => _plugin.Automation.Emotes = v);
-        NativeStyle.Button(_body, "Stop all automation", () => _plugin.Run(_plugin.StopAutomation));
-        AutomationDetails();
     }
 
     private void Lobby()
     {
+        if (!FeatureNotice(Feature.Gifts)) return;
         NativeStyle.Label(_body, "GIFTS", 28, 19);
         NativeStyle.Label(_body, "Your points pay for their chest. They receive the item.", 42, 13).textWrappingMode = TextWrappingModes.Normal;
         ToggleRow("Auto-gift ready chests", () => _plugin.Automation.Gift, v => _plugin.Automation.Gift = v);
@@ -359,6 +368,7 @@ internal sealed partial class ModWindow : MonoBehaviour
 
     private void Cosmetics()
     {
+        if (!FeatureNotice(Feature.Catalog)) return;
         var views = NativeStyle.Row(_body, 30);
         var names = new[] { "Catalog", "Presets", "Emote wheel" };
         var title = NativeStyle.Text(views, names[_cosmeticView], 17);
@@ -382,6 +392,7 @@ internal sealed partial class ModWindow : MonoBehaviour
             _plugin.Cosmetics.SetPublish(!_plugin.Cosmetics.Publish);
             ShowTab(2);
         }));
+        share.interactable = _plugin.Available(Feature.Sharing);
         share.targetGraphic.color = _plugin.Cosmetics.Publish ? new Color(0.76f, 1f, 0.88f) : new Color(0.55f, 0.55f, 0.55f);
         Hint(share.transform, _plugin.Cosmetics.Publish ? "Lobby sharing is on. Click to use local appearance only." : "Lobby sharing is off. Click to share your appearance.");
         var restore = NativeStyle.IconButton(views, ControlIcon.Reset, () => _plugin.Run(() =>
@@ -390,10 +401,12 @@ internal sealed partial class ModWindow : MonoBehaviour
             FillGrid();
             if (_presetList) FillPresets();
         }));
+        restore.interactable = _plugin.Available(Feature.Appearance);
         Hint(restore.transform, "Restore your normally equipped skin and hat");
         _editingWheel = _cosmeticView == 2;
         if (_editingWheel)
         {
+            if (!FeatureNotice(Feature.Wheel)) return;
             _wheelEditor = NativeStyle.Rect("Wheel editor", _body);
             NativeStyle.Vertical(_wheelEditor);
             FillWheelEditor();
@@ -401,6 +414,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         }
         if (_cosmeticView == 1)
         {
+            if (!FeatureNotice(Feature.Appearance)) return;
             CreatePresets();
             return;
         }
@@ -459,6 +473,7 @@ internal sealed partial class ModWindow : MonoBehaviour
     private void FillGrid()
     {
         if (!_grid) return;
+        if (!_plugin.Available(Feature.Catalog)) { ShowTab(2); return; }
         HideTooltip();
         _favoritesButton.targetGraphic.color = _favoritesOnly ? new Color(1f, 0.88f, 0.58f) : Color.white;
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
@@ -492,6 +507,7 @@ internal sealed partial class ModWindow : MonoBehaviour
                     FillGrid();
                 }
             }));
+            card.interactable = _plugin.Available(cosmetic.IsEmote ? Feature.Emotes : Feature.Appearance);
             card.gameObject.name = cosmetic.ItemName;
             Hint(card.transform, cosmetic.ItemName + (cosmetic.IsEmote ? "\nClick to send. + / − changes your wheel." : "\nClick to wear and save."));
             var imageRect = NativeStyle.Rect("Icon", card.transform);
@@ -526,6 +542,7 @@ internal sealed partial class ModWindow : MonoBehaviour
                         _emoteFeedback = _plugin.Wheel.Status;
                         FillGrid();
                     }));
+                toggle.interactable = _plugin.Available(Feature.Wheel);
                 var rect = (RectTransform)toggle.transform;
                 rect.anchorMin = rect.anchorMax = Vector2.one;
                 rect.pivot = Vector2.one;
@@ -557,6 +574,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         Hint(row, title);
         var button = NativeStyle.Button(row, "Off", () => _plugin.Run(() =>
         {
+            if (automation) _plugin.Require(_tab == 1 ? Feature.Gifts : Feature.Automation);
             if (automation && _plugin.Automation.Error != null)
                 throw new InvalidOperationException("Resume after the error or stop all automation before changing its options.");
             set(!get());

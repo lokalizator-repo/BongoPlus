@@ -4,6 +4,7 @@ using System.Collections;
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Linq;
 using BepInEx;
 using BongoCat;
 using HarmonyLib;
@@ -16,7 +17,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "0.2.3";
+    public const string Version = "0.3.0";
     private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -25,17 +26,23 @@ public sealed class Plugin : BaseUnityPlugin
     internal EmoteWheelService Wheel = null!;
     private ModSettings _settings = null!;
     internal ModSettings Settings => _settings;
-    private Harmony? _harmony;
+    private readonly Dictionary<Feature, Harmony> _harmonies = new Dictionary<Feature, Harmony>();
+    internal FeatureCompatibility Compatibility { get; } = new FeatureCompatibility();
     private ModWindow _window = null!;
     private bool _failed;
     private float _nextInit;
+    private bool _uiFailed;
+
+    internal bool Available(Feature feature) => Compatibility.Available(feature);
+    internal void Require(Feature feature) => Compatibility.Require(feature);
+    internal bool Execute(Feature feature, Action action) => Compatibility.Execute(feature, action);
 
     [HarmonyPatch(typeof(Helper.InputFieldCache), "get_FocusingInputField")]
     private static class ModInputFocused
     {
         private static bool Prefix(ref bool __result)
         {
-            if (!(Instance?._window?.IsTyping ?? false)) return true;
+            if (!(Instance?.Available(Feature.Input) ?? false) || !(Instance?._window?.IsTyping ?? false)) return true;
             __result = true;
             return false;
         }
@@ -46,21 +53,22 @@ public sealed class Plugin : BaseUnityPlugin
         Instance = this;
         try
         {
-            var assembly = Path.Combine(Paths.ManagedPath, "Assembly-CSharp.dll");
-            using var sha = SHA256.Create();
-            using var input = File.OpenRead(assembly);
-            var actual = BitConverter.ToString(sha.ComputeHash(input)).Replace("-", "").ToLowerInvariant();
-            if (actual != ExpectedAssembly)
-                throw new InvalidOperationException("Game build changed. This plugin requires a compatibility update.");
+            ReadBuildFingerprint();
 
             _settings = new ModSettings(Config);
+            Compatibility.Disabled = OnFeatureDisabled;
+            GameApiContracts.Check(Compatibility);
             Balance = new BalanceService(Logger);
             Automation = new AutomationService(Logger, Balance, _settings);
             Cosmetics = new CosmeticService(Logger, _settings);
             Wheel = new EmoteWheelService(_settings, Logger);
-            _harmony = new Harmony(Id);
-            _harmony.PatchAll(typeof(Plugin).Assembly);
-            Logger.LogInfo("Bongo Cat Mods " + Version + " loaded. Build verified; saved preferences restored.");
+            Patch(Feature.Input, typeof(ModInputFocused));
+            Patch(Feature.Automation, typeof(PurchaseFinished));
+            Patch(Feature.Gifts, typeof(GiftClicked));
+            if (RefreshAppearance.HasTargets) Patch(Feature.Appearance, typeof(RefreshAppearance));
+            Patch(Feature.Wheel, typeof(WheelStarted), typeof(WheelValidated), typeof(WheelRearranged), typeof(WheelOpened),
+                typeof(WheelClosed), typeof(WheelHovered), typeof(WheelEmoteRemoved), typeof(WheelEmoteToggled));
+            Logger.LogInfo("Bongo Cat Mods " + Version + " loaded. " + Compatibility.Summary);
         }
         catch (Exception error)
         {
@@ -74,26 +82,70 @@ public sealed class Plugin : BaseUnityPlugin
         if (_failed) return;
         try
         {
-            if (!_window && Time.realtimeSinceStartup >= _nextInit)
+            if (!_window && !_uiFailed && Time.realtimeSinceStartup >= _nextInit)
             {
                 _nextInit = Time.realtimeSinceStartup + 2f;
-                if (GameAccess.Ready && CatInventory.Instance && CatInventory.Instance.IsInitialized && BongoCat.UiThemes.UiThemeManager.Instance)
+                if (BongoCat.UiThemes.UiThemeManager.Instance && NativeUiReady())
                 {
                     _window = gameObject.AddComponent<ModWindow>();
                     _window.Initialize(this);
                     Logger.LogInfo("Native mod window created. Open it from Mods in the game menu.");
                 }
             }
-            Balance.Tick();
-            Automation.Tick();
-            Cosmetics.Tick();
-            Wheel.Tick();
         }
         catch (Exception error)
         {
-            Automation?.Stop("Automation stopped after an error. See the BepInEx log.");
             Logger.LogError(error);
-            _failed = true;
+            if (_window) Destroy(_window);
+            _uiFailed = true;
+        }
+        Execute(Feature.Balance, Balance.Tick);
+        Execute(Feature.Automation, Automation.Tick);
+        Execute(Feature.Appearance, Cosmetics.Tick);
+        Execute(Feature.Wheel, Wheel.Tick);
+    }
+
+    private bool NativeUiReady() => !Available(Feature.Catalog) || CatalogReady();
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static bool CatalogReady() => CatInventory.Instance && CatInventory.Instance.IsInitialized;
+
+    private void ReadBuildFingerprint()
+    {
+        try
+        {
+            using var sha = SHA256.Create();
+            using var input = File.OpenRead(Path.Combine(Paths.ManagedPath, "Assembly-CSharp.dll"));
+            Compatibility.BuildHash = BitConverter.ToString(sha.ComputeHash(input)).Replace("-", "").ToLowerInvariant();
+            Compatibility.KnownBuild = Compatibility.BuildHash == ExpectedAssembly;
+        }
+        catch (Exception error) { Logger.LogWarning("Build fingerprint unavailable: " + error.GetBaseException().Message); }
+        if (!Compatibility.KnownBuild) Logger.LogWarning("Unrecognized game assembly (" + Compatibility.BuildHash + "). Checking each feature's API contract.");
+    }
+
+    private void Patch(Feature feature, params Type[] patches)
+    {
+        if (!Available(feature)) return;
+        var harmony = new Harmony(Id + "." + feature);
+        _harmonies.Add(feature, harmony);
+        Execute(feature, () => { foreach (var patch in patches) harmony.CreateClassProcessor(patch).Patch(); });
+    }
+
+    private void OnFeatureDisabled(Feature feature, string reason)
+    {
+        Logger.LogWarning(feature + " disabled: " + reason);
+        foreach (var pair in _harmonies.Where(pair => !Available(pair.Key)).ToArray())
+        {
+            try { pair.Value.UnpatchSelf(); }
+            catch (Exception error) { Logger.LogWarning(error); }
+            _harmonies.Remove(pair.Key);
+        }
+        if (!Available(Feature.Automation)) Automation?.Stop("Automation is unavailable: " + Compatibility.Reason(Feature.Automation));
+        else if (!Available(Feature.Gifts) && Automation != null) Automation.Gift = false;
+        if (!Available(Feature.Wheel) && Wheel != null)
+        {
+            try { Wheel.Deactivate(); }
+            catch (Exception error) { Logger.LogWarning("Native wheel restore: " + error.GetBaseException().Message); }
         }
     }
 
@@ -129,7 +181,7 @@ public sealed class Plugin : BaseUnityPlugin
         if (Instance != this) return;
         Automation?.Stop();
         if (_window) Destroy(_window);
-        _harmony?.UnpatchSelf();
+        foreach (var harmony in _harmonies.Values) harmony.UnpatchSelf();
         Balance?.Dispose();
         SpriteContentBounds.Dispose();
         Instance = null;
@@ -138,7 +190,8 @@ public sealed class Plugin : BaseUnityPlugin
     [HarmonyPatch(typeof(ShopItem), nameof(ShopItem.Callback))]
     private static class PurchaseFinished
     {
-        private static void Postfix(ShopItem __instance, int itemId) => Instance?.Automation?.OnPurchaseFinished(__instance, itemId);
+        private static void Postfix(ShopItem __instance, int itemId) =>
+            Instance?.Execute(Feature.Automation, () => Instance.Automation.OnPurchaseFinished(__instance, itemId));
     }
 
     [HarmonyPatch(typeof(EmoteDonut), "Start")]
@@ -157,18 +210,18 @@ public sealed class Plugin : BaseUnityPlugin
             {
                 (routine as IDisposable)?.Dispose();
             }
-            Instance?.Wheel?.OnReady(wheel);
+            Instance?.Execute(Feature.Wheel, () => Instance.Wheel.OnReady(wheel));
         }
     }
 
     [HarmonyPatch(typeof(EmoteDonut), nameof(EmoteDonut.Validate))]
     private static class WheelValidated
     {
-        private static void Prefix() => Instance?.Wheel?.BeginValidation();
+        private static void Prefix() => Instance?.Execute(Feature.Wheel, () => Instance.Wheel.BeginValidation());
 
         private static Exception? Finalizer(Exception? __exception)
         {
-            Instance?.Wheel?.EndValidation();
+            Instance?.Execute(Feature.Wheel, () => Instance.Wheel.EndValidation());
             return __exception;
         }
     }
@@ -179,9 +232,8 @@ public sealed class Plugin : BaseUnityPlugin
         private static bool Prefix(EmoteDonut __instance)
         {
             var pager = __instance.GetComponent<WheelPager>();
-            if (!pager) return true;
-            pager.Refresh();
-            return false;
+            if (!pager || !(Instance?.Available(Feature.Wheel) ?? false)) return true;
+            return !Instance!.Execute(Feature.Wheel, pager.Refresh);
         }
     }
 
@@ -191,9 +243,8 @@ public sealed class Plugin : BaseUnityPlugin
         private static bool Prefix(EmoteDonut __instance)
         {
             var pager = __instance.GetComponent<WheelPager>();
-            if (!pager) return true;
-            pager.Open();
-            return false;
+            if (!pager || !(Instance?.Available(Feature.Wheel) ?? false)) return true;
+            return !Instance!.Execute(Feature.Wheel, pager.Open);
         }
     }
 
@@ -203,57 +254,71 @@ public sealed class Plugin : BaseUnityPlugin
         private static bool Prefix(EmoteDonut __instance)
         {
             var pager = __instance.GetComponent<WheelPager>();
-            if (!pager) return true;
-            pager.Close();
-            return false;
+            if (!pager || !(Instance?.Available(Feature.Wheel) ?? false)) return true;
+            return !Instance!.Execute(Feature.Wheel, pager.Close);
         }
     }
 
     [HarmonyPatch(typeof(EmoteDonut), "Update")]
     private static class WheelHovered
     {
-        private static bool Prefix(EmoteDonut __instance) =>
-            !(__instance.GetComponent<WheelPager>()?.KeepOpenOnHover() ?? false);
+        private static bool Prefix(EmoteDonut __instance)
+        {
+            var keep = false;
+            Instance?.Execute(Feature.Wheel, () => keep = __instance.GetComponent<WheelPager>()?.KeepOpenOnHover() ?? false);
+            return !keep;
+        }
     }
 
     [HarmonyPatch(typeof(EmoteDonut), "RemoveEmote")]
     private static class WheelEmoteRemoved
     {
         private static bool Prefix(SteamItemRuntime steamItem) =>
-            !(Instance?.Wheel?.KeepDuringValidation(steamItem) ?? false);
+            !(Instance?.Available(Feature.Wheel) == true && (Instance.Wheel?.KeepDuringValidation(steamItem) ?? false));
     }
 
     [HarmonyPatch(typeof(EmoteDonut), nameof(EmoteDonut.ToggleItem))]
     private static class WheelEmoteToggled
     {
-        private static void Prefix(EmoteDonut __instance, SteamItemRuntime steamItem, out bool __state) =>
-            __state = Instance?.Wheel?.Contains(__instance, steamItem.Id) ?? false;
+        private static void Prefix(EmoteDonut __instance, SteamItemRuntime steamItem, out bool __state)
+        {
+            var contains = false;
+            Instance?.Execute(Feature.Wheel, () => contains = Instance.Wheel.Contains(__instance, steamItem.Id));
+            __state = contains;
+        }
 
         private static void Postfix(SteamItemRuntime steamItem, bool __state) =>
-            Instance?.Wheel?.ObserveToggle(steamItem, __state);
+            Instance?.Execute(Feature.Wheel, () => Instance.Wheel.ObserveToggle(steamItem, __state));
     }
 
     [HarmonyPatch]
     private static class RefreshAppearance
     {
+        private static readonly string[] Names = { nameof(CatCosmetics.Validate), "Equip", "Unequip",
+            nameof(CatCosmetics.RestoreActuallyEquippedItems), "OnLobbyEnter" };
+        public static bool HasTargets => TargetMethods().Any();
         private static IEnumerable<MethodBase> TargetMethods()
         {
-            foreach (var name in new[] { nameof(CatCosmetics.Validate), "Equip", "Unequip",
-                nameof(CatCosmetics.RestoreActuallyEquippedItems), "OnLobbyEnter" })
-                yield return AccessTools.Method(typeof(CatCosmetics), name)
-                    ?? throw new MissingMethodException(typeof(CatCosmetics).FullName, name);
+            foreach (var name in Names)
+                foreach (var method in typeof(CatCosmetics).GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Where(method => method.Name == name && method.ReturnType == typeof(void) && !method.ContainsGenericParameters))
+                    yield return method;
         }
 
-        private static void Postfix() => Instance?.Cosmetics?.Apply(true);
+        private static void Postfix() => Instance?.Execute(Feature.Appearance, () => Instance.Cosmetics.Apply(true));
     }
 
     [HarmonyPatch(typeof(BongoCat.Multiplayer.OpenChestForMember), nameof(BongoCat.Multiplayer.OpenChestForMember.OnClicked))]
     private static class GiftClicked
     {
-        private static void Prefix(BongoCat.Multiplayer.OpenChestForMember __instance, out bool __state) =>
-            __state = AutomationService.WasGiftClicked(__instance);
+        private static void Prefix(BongoCat.Multiplayer.OpenChestForMember __instance, out bool __state)
+        {
+            var clicked = true;
+            Instance?.Execute(Feature.Gifts, () => clicked = AutomationService.WasGiftClicked(__instance));
+            __state = clicked;
+        }
 
         private static void Postfix(BongoCat.Multiplayer.OpenChestForMember __instance, bool __state) =>
-            Instance?.Automation?.OnGiftClicked(__instance, __state);
+            Instance?.Execute(Feature.Gifts, () => Instance.Automation.OnGiftClicked(__instance, __state));
     }
 }

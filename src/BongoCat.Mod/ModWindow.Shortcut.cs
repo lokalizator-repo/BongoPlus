@@ -3,6 +3,7 @@ using System.Linq;
 using BepInEx.Configuration;
 using TMPro;
 using UnityEngine;
+using System.Runtime.CompilerServices;
 
 namespace BongoCatMod;
 
@@ -17,6 +18,7 @@ internal sealed partial class ModWindow
 
     private void ShortcutSettings()
     {
+        if (!FeatureNotice(Feature.Input)) return;
         var row = NativeStyle.Row(_body);
         var title = NativeStyle.Text(row, "Open Mods shortcut", 14);
         title.alignment = TextAlignmentOptions.MidlineLeft;
@@ -60,4 +62,7 @@ internal sealed partial class ModWindow
         _settings.ToggleShortcut.Value = shortcut;
         _settings.Save();
     }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private bool ShortcutPressed() => !Helper.InputFieldCache.FocusingInputField && _settings.ToggleShortcut.Value.IsDown();
 }

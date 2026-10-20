@@ -35,6 +35,7 @@ internal sealed class CosmeticService
 
     public void SetPublish(bool value)
     {
+        if (value) Plugin.Instance!.Require(Feature.Sharing);
         if (Publish == value) return;
         Publish = value;
         _settings.ShareAppearance.Value = value;
@@ -51,6 +52,7 @@ internal sealed class CosmeticService
 
     public void Select(SteamItemRuntime item)
     {
+        Plugin.Instance!.Require(Feature.Appearance);
         if (!Cat.Instance) throw new InvalidOperationException("Wait for your cat to load.");
         if (!_settings.Appearance.ContainsKey(item.ItemSlot))
             throw new ArgumentException("Choose a skin or hat.", nameof(item));
@@ -103,6 +105,7 @@ internal sealed class CosmeticService
 
     public void ApplyPreset(AppearancePreset preset)
     {
+        Plugin.Instance!.Require(Feature.Appearance);
         if (!Cat.Instance || !SteamItemIdReference.Inst) throw new InvalidOperationException("Wait for your cat to load.");
         var values = new Dictionary<string, int> { ["skin"] = preset.Skin, ["hat"] = preset.Hat };
         foreach (var pair in values)
@@ -122,6 +125,7 @@ internal sealed class CosmeticService
 
     public void SendEmote(SteamItemRuntime item)
     {
+        Plugin.Instance!.Require(Feature.Emotes);
         if (!item.IsEmote) throw new ArgumentException("Choose a standard emote.", nameof(item));
         if (!Cat.Instance || !Cat.Instance.emoteSpawner || !Cat.Instance.emoteSpawner.gameObject.activeInHierarchy)
             throw new InvalidOperationException("Wait for your cat to load.");
@@ -146,6 +150,7 @@ internal sealed class CosmeticService
 
     public void Apply(bool force = false)
     {
+        if (!(Plugin.Instance?.Available(Feature.Appearance) ?? false)) return;
         if (!Cat.Instance || !SteamItemIdReference.Inst || !MemoryImageCache.Instance) return;
         var restoredNow = false;
         if (_restorePending)
@@ -169,26 +174,12 @@ internal sealed class CosmeticService
             restoredNow = true;
         }
         if (_selected.Count == 0) return;
-        var lobby = LobbyData.Current;
-        var synchronized = Publish && lobby.IsValid;
         foreach (var pair in _selected)
         {
             if (_dirty || force)
             {
                 if (pair.Value == -2) Cat.Instance.ClearItemSlot(pair.Key);
                 else Cat.Instance.SetItem(SteamItemIdReference.Inst[pair.Value], false);
-            }
-            if (Publish && lobby.IsValid)
-            {
-                var me = lobby.Me;
-                var value = Math.Max(-1, pair.Value).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                if (me[pair.Key] != value)
-                {
-                    synchronized = false;
-                    me[pair.Key] = value;
-                    _log.LogInfo("Cosmetic metadata submitted: lobby=" + lobby.SteamId +
-                        ", slot=" + pair.Key + ", item=" + value + ".");
-                }
             }
         }
         if ((_dirty || force) && OnDemandRenderHelper.Instance)
@@ -197,14 +188,31 @@ internal sealed class CosmeticService
             _log.LogInfo("Saved appearance restored from local assets at " +
                 Time.realtimeSinceStartup.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "s.");
         _dirty = false;
-        SetStatus(!Publish ? "Local appearance only. Lobby sharing is off."
-            : !lobby.IsValid ? "Appearance selected. Join a lobby to share it."
-            : synchronized ? "Appearance matches your Steam lobby data."
-            : "Appearance sent to Steam. Waiting for lobby data.");
+        if (!Publish) SetStatus("Local appearance only. Lobby sharing is off.");
+        else if (!Plugin.Instance!.Execute(Feature.Sharing, PublishSelected))
+            SetStatus("Appearance saved locally. Lobby sharing is unavailable after this game update.");
+    }
+
+    private void PublishSelected()
+    {
+        var lobby = LobbyData.Current;
+        if (!lobby.IsValid) { SetStatus("Appearance selected. Join a lobby to share it."); return; }
+        var synchronized = true;
+        foreach (var pair in _selected)
+        {
+            var me = lobby.Me;
+            var value = Math.Max(-1, pair.Value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (me[pair.Key] == value) continue;
+            synchronized = false;
+            me[pair.Key] = value;
+            _log.LogInfo("Cosmetic metadata submitted: lobby=" + lobby.SteamId + ", slot=" + pair.Key + ", item=" + value + ".");
+        }
+        SetStatus(synchronized ? "Appearance matches your Steam lobby data." : "Appearance sent to Steam. Waiting for lobby data.");
     }
 
     public void Restore()
     {
+        Plugin.Instance!.Require(Feature.Appearance);
         if (!Cat.Instance || !CatCosmetics.Instance) return;
         _selected.Clear();
         _restorePending = false;
@@ -218,6 +226,11 @@ internal sealed class CosmeticService
     }
 
     public void RestorePublished()
+    {
+        Plugin.Instance?.Execute(Feature.Sharing, RestorePublishedNative);
+    }
+
+    private void RestorePublishedNative()
     {
         if (!LobbyData.Current.IsValid || !CatCosmetics.Instance) return;
         foreach (var slot in _settings.Appearance.Keys)

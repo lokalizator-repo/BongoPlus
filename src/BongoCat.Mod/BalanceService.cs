@@ -28,6 +28,7 @@ internal sealed class BalanceService : IDisposable
 
     public void Set(int target)
     {
+        Plugin.Instance!.Require(Feature.Balance);
         if (!GameAccess.Ready || _waiting)
             throw new InvalidOperationException("Wait for Steam stats to finish loading or saving.");
 
@@ -40,6 +41,7 @@ internal sealed class BalanceService : IDisposable
 
     public void Restore()
     {
+        Plugin.Instance!.Require(Feature.Balance);
         if (_original == null)
             throw new InvalidOperationException("No balance backup in this session.");
         if (!GameAccess.Ready || _waiting)
@@ -89,6 +91,7 @@ internal sealed class BalanceService : IDisposable
 
     private void OnStored(UserStatsStored_t result)
     {
+        if (!(Plugin.Instance?.Available(Feature.Balance) ?? false)) return;
         if (!_waiting || result.m_nGameID != 3419430UL) return;
         _waiting = false;
         Healthy = result.m_eResult == EResult.k_EResultOK;

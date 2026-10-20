@@ -12,13 +12,13 @@ namespace BongoCatMod;
 
 internal sealed class WheelPager : MonoBehaviour
 {
-    private static readonly FieldInfo Entries = GameAccess.RequiredField(typeof(EmoteDonut), "IDtoEmoteEntry");
-    private static readonly FieldInfo Parent = GameAccess.RequiredField(typeof(EmoteDonut), "emoteEntryParent");
-    private static readonly FieldInfo Radius = GameAccess.RequiredField(typeof(EmoteDonut), "radius");
-    private static readonly FieldInfo IsOpen = GameAccess.RequiredField(typeof(EmoteDonut), "_isOpen");
-    private static readonly FieldInfo ActivelyClosed = GameAccess.RequiredField(typeof(EmoteDonut), "_activelyClosed");
-    private static readonly FieldInfo ShowWheel = GameAccess.RequiredField(typeof(EmoteDonut), "_showEmoteWheel");
-    private static readonly FieldInfo Menu = GameAccess.RequiredField(typeof(EmoteDonut), "_menu");
+    private static FieldInfo Entries => GameAccess.RequiredField(typeof(EmoteDonut), "IDtoEmoteEntry");
+    private static FieldInfo Parent => GameAccess.RequiredField(typeof(EmoteDonut), "emoteEntryParent");
+    private static FieldInfo Radius => GameAccess.RequiredField(typeof(EmoteDonut), "radius");
+    private static FieldInfo IsOpen => GameAccess.RequiredField(typeof(EmoteDonut), "_isOpen");
+    private static FieldInfo ActivelyClosed => GameAccess.RequiredField(typeof(EmoteDonut), "_activelyClosed");
+    private static FieldInfo ShowWheel => GameAccess.RequiredField(typeof(EmoteDonut), "_showEmoteWheel");
+    private static FieldInfo Menu => GameAccess.RequiredField(typeof(EmoteDonut), "_menu");
     private readonly Dictionary<int, RectTransform> _wrappers = new Dictionary<int, RectTransform>();
     private EmoteDonut _wheel = null!;
     private RectTransform _parent = null!;
@@ -100,6 +100,12 @@ internal sealed class WheelPager : MonoBehaviour
         !TranslucentOnHoverSetting.Instance.DisablePopups;
 
     private void LateUpdate()
+    {
+        if (!(Plugin.Instance?.Available(Feature.Wheel) ?? false)) return;
+        Plugin.Instance!.Execute(Feature.Wheel, RefreshLayout);
+    }
+
+    private void RefreshLayout()
     {
         if (!_wheel) return;
         if (!_previous && NativeStyle.Font)
@@ -213,5 +219,28 @@ internal sealed class WheelPager : MonoBehaviour
         _previous.gameObject.SetActive(navigation);
         _next.gameObject.SetActive(navigation);
         _pageLabel.gameObject.SetActive(navigation);
+    }
+
+    public void RestoreNative()
+    {
+        enabled = false;
+        foreach (var pair in _wrappers)
+        {
+            if (!Items.TryGetValue(pair.Key, out var entry) || !entry) continue;
+            var rect = (RectTransform)entry.transform;
+            rect.SetParent(_parent, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = pair.Value.rect.size;
+            rect.anchoredPosition = Vector2.zero;
+            rect.localScale = Vector3.one;
+            entry.gameObject.SetActive(Opened);
+            Destroy(pair.Value.gameObject);
+        }
+        _wrappers.Clear();
+        if (_previous) Destroy(_previous.gameObject);
+        if (_next) Destroy(_next.gameObject);
+        if (_pageLabel) Destroy(_pageLabel.gameObject);
+        GameAccess.RequiredMethod(typeof(EmoteDonut), "RearrangeEmotes").Invoke(_wheel, null);
+        Destroy(this);
     }
 }

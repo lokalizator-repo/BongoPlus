@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <GameDirectory Condition="'$(GameDirectory)' == ''">D:/Gaming/Launchers/Steam/steamapps/common/BongoCat</GameDirectory>
+    <ManagedDirectory>$(GameDirectory)/BongoCat_Data/Managed</ManagedDirectory>
+    <LoaderDirectory>$(MSBuildThisFileDirectory)../../vendor/BepInEx-5.4.23.5/BepInEx/core</LoaderDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/BongoCat.Mod/BongoCat.Mod.csproj" />
+    <Reference Include="BepInEx"><HintPath>$(LoaderDirectory)/BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(LoaderDirectory)/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(ManagedDirectory)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Heathen.Steamworks"><HintPath>$(ManagedDirectory)/Heathen.Steamworks.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(ManagedDirectory)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(ManagedDirectory)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(ManagedDirectory)/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="$(ManagedDirectory)/UnityEngine.*Module.dll"><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

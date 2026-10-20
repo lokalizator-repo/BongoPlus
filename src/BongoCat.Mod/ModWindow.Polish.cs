@@ -10,6 +10,31 @@ namespace BongoCatMod;
 
 internal sealed partial class ModWindow
 {
+    private bool FeatureNotice(Feature feature)
+    {
+        if (_plugin.Available(feature)) return true;
+        NativeStyle.Label(_body, feature + " is unavailable after this game update.\n" + _plugin.Compatibility.Reason(feature), 90, 13)
+            .textWrappingMode = TextWrappingModes.Normal;
+        return false;
+    }
+
+    private void CompatibilityDetails()
+    {
+        var button = NativeStyle.Button(_body, "Compatibility details", () => { });
+        var details = NativeStyle.Label(_body, _plugin.Compatibility.Summary, 260, 12);
+        details.textWrappingMode = TextWrappingModes.Normal;
+        details.gameObject.SetActive(false);
+        button.onClick.AddListener(() => details.gameObject.SetActive(!details.gameObject.activeSelf));
+        _refreshers.Add(() =>
+        {
+            details.text = _plugin.Compatibility.Summary;
+            details.GetComponent<LayoutElement>().preferredHeight = Mathf.Max(220,
+                details.GetPreferredValues(details.text, 370, float.PositiveInfinity).y + 12);
+            button.GetComponentInChildren<TMP_Text>().text = _plugin.Compatibility.KnownBuild
+                ? "Compatibility details" : "Game updated · compatibility details";
+        });
+    }
+
     private void StateChanged()
     {
         _stateDirty = true;
@@ -168,7 +193,20 @@ internal sealed partial class ModWindow
             preview.anchorMin = new Vector2(0, 0.22f);
             preview.anchorMax = Vector2.one;
             NativeStyle.Offsets(preview, new Vector2(8, 4), new Vector2(-8, -8));
-            preview.gameObject.AddComponent<PresetPreview>().Initialize(preset);
+            if (!_plugin.Execute(Feature.Previews, () => preview.gameObject.AddComponent<PresetPreview>().Initialize(preset)))
+            {
+                ClearChildren(preview);
+                var renderer = preview.GetComponent<PresetPreview>();
+                if (renderer) Destroy(renderer);
+                var item = _plugin.Cosmetics.Items("skin", "").FirstOrDefault(candidate => candidate.Id == preset.Skin);
+                if (item != null)
+                {
+                    var image = preview.gameObject.AddComponent<Image>();
+                    image.sprite = item.Icon;
+                    image.preserveAspect = true;
+                    image.raycastTarget = false;
+                }
+            }
             var frame = NativeStyle.Rect("Selected preset", apply.transform);
             NativeStyle.Stretch(frame);
             frame.gameObject.AddComponent<RoundedGraphic>().InitializeSelection();
@@ -201,6 +239,13 @@ internal sealed partial class ModWindow
         if (!_wheelEditor) return;
         HideTooltip();
         ClearChildren(_wheelEditor);
+        if (!_plugin.Available(Feature.Wheel))
+        {
+            _wheelSignature = "";
+            NativeStyle.Label(_wheelEditor, "Emote wheel is unavailable after this game update. See General → Compatibility details.", 64, 13)
+                .textWrappingMode = TextWrappingModes.Normal;
+            return;
+        }
         var ids = _plugin.Wheel.ItemIds;
         _wheelSignature = string.Join(",", ids);
         var pages = WheelLayout.PageCount(ids.Length);

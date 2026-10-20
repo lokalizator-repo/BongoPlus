@@ -13,10 +13,10 @@ namespace BongoCatMod;
 
 internal sealed class AutomationService
 {
-    private static readonly System.Reflection.FieldInfo Target = GameAccess.RequiredField(typeof(OpenChestForMember), "_targetUser");
-    private static readonly System.Reflection.FieldInfo Chest = GameAccess.RequiredField(typeof(OpenChestForMember), "_chestType");
-    private static readonly System.Reflection.FieldInfo ChestActive = GameAccess.RequiredField(typeof(OpenChestForMember), "_setChestActive");
-    private static readonly System.Reflection.FieldInfo Clicked = GameAccess.RequiredField(typeof(OpenChestForMember), "_hasClicked");
+    private static System.Reflection.FieldInfo Target => GameAccess.RequiredField(typeof(OpenChestForMember), "_targetUser");
+    private static System.Reflection.FieldInfo Chest => GameAccess.RequiredField(typeof(OpenChestForMember), "_chestType");
+    private static System.Reflection.FieldInfo ChestActive => GameAccess.RequiredField(typeof(OpenChestForMember), "_setChestActive");
+    private static System.Reflection.FieldInfo Clicked => GameAccess.RequiredField(typeof(OpenChestForMember), "_hasClicked");
     private readonly ManualLogSource _log;
     private readonly BalanceService _balance;
     private readonly AutomationPolicy _policy = new AutomationPolicy();
@@ -37,7 +37,7 @@ internal sealed class AutomationService
     private readonly Queue<string> _recent = new Queue<string>();
     public AutomationActivity Activity { get; } = new AutomationActivity();
     public string? Error { get; private set; }
-    public bool CanRetry => Error != null && !_pendingOwn && _balance.Healthy && !_balance.Pending &&
+    public bool CanRetry => (Plugin.Instance?.Available(Feature.Automation) ?? false) && Error != null && !_pendingOwn && _balance.Healthy && !_balance.Pending &&
         GameAccess.Ready && !GameAccess.IsOpening(Shop.NormalShop) && !GameAccess.IsOpening(Shop.EmoteShop);
     public string Recent => string.Join("\n", _recent);
     public string Summary => "This session · Opened: " + Activity.OwnOpened + " · Gifts sent: " + Activity.GiftRequests +
@@ -56,8 +56,8 @@ internal sealed class AutomationService
         _log = log;
         _balance = balance;
         _settings = settings;
-        BuyOwn = settings.BuyOwn.Value;
-        Gift = settings.Gift.Value;
+        BuyOwn = settings.BuyOwn.Value && (Plugin.Instance?.Available(Feature.Automation) ?? false);
+        Gift = settings.Gift.Value && (Plugin.Instance?.Available(Feature.Gifts) ?? false);
         Cosmetics = settings.CosmeticChests.Value;
         Emotes = settings.EmoteChests.Value;
         AllPlayers = settings.AllPlayers.Value;
@@ -86,9 +86,10 @@ internal sealed class AutomationService
 
     public void Retry()
     {
+        Plugin.Instance!.Require(Feature.Automation);
         if (!CanRetry) throw new InvalidOperationException("Wait for the pending exchange and Steam stats to finish. Reload the game if Steam stats failed.");
         BuyOwn = _resumeOwn;
-        Gift = _resumeGift;
+        Gift = _resumeGift && Plugin.Instance!.Available(Feature.Gifts);
         _settings.BuyOwn.Value = BuyOwn;
         _settings.Gift.Value = Gift;
         _settings.Save();
@@ -107,35 +108,21 @@ internal sealed class AutomationService
 
     public void Tick()
     {
+        if (!(Plugin.Instance?.Available(Feature.Automation) ?? false)) return;
         if (!SteamTools.Interface.IsReady) return;
         var now = Time.realtimeSinceStartup;
         if (now < _nextScan) return;
         _nextScan = now + 0.25f;
-        var lobby = LobbyData.Current.IsValid ? LobbyData.Current.SteamId.m_SteamID : 0;
-        if (_lobby != lobby)
-        {
-            _lobby = lobby;
-            _policy.NewLobby();
-            _giftStates.Clear();
-            _sentAt.Clear();
-            Activity.LeaveLobby();
-            _chestViews = Array.Empty<OpenChestForMember>();
-            _nextViewRefresh = 0;
-        }
+        Plugin.Instance!.Execute(Feature.Gifts, () => TickLobby(now));
+        var lobby = _lobby;
         if (_pendingOwn && now - _pendingAt > 45f && Error == null)
             Fail("Chest exchange timed out. Waiting for its final result before retry is available.");
-        if (lobby != 0 && (Gift || _sentAt.Count > 0))
-            TickGifts(now, Gift && Error == null && GameAccess.Ready && !_balance.Pending && _balance.Healthy);
         if (Error != null) return;
         if ((!BuyOwn && !Gift) || !GameAccess.Ready || _balance.Pending) return;
         if (!_balance.Healthy) { Fail("Steam stats save failed. Restart the game to reload stats."); return; }
 
-        if (_pendingOwn)
-        {
-            return;
-        }
+        if (_pendingOwn) return;
         if (GameAccess.IsOpening(Shop.NormalShop) || GameAccess.IsOpening(Shop.EmoteShop)) return;
-
         if (BuyOwn && now >= _nextOwn)
         {
             foreach (var shop in new[] { Shop.NormalShop, Shop.EmoteShop })
@@ -151,13 +138,28 @@ internal sealed class AutomationService
                 return;
             }
         }
-        if (Error == null)
-            Status = !Cosmetics && !Emotes ? "Choose at least one chest type."
-                : Gift && !BuyOwn && lobby == 0 ? "Join a lobby to send gifts."
-                : Gift && !BuyOwn && !AllPlayers && SelectedPlayers.Count == 0 ? "Choose recipients or enable everyone in the lobby."
-                : BuyOwn && new[] { Shop.NormalShop, Shop.EmoteShop }.Any(shop => shop && Enabled(shop.ChestType) && shop.ChestIsReady && !shop.CanAffordChest)
-                    ? "Waiting for enough points."
-                : "Watching for ready chests.";
+        Status = !Cosmetics && !Emotes ? "Choose at least one chest type."
+            : Gift && !BuyOwn && lobby == 0 ? "Join a lobby to send gifts."
+            : Gift && !BuyOwn && !AllPlayers && SelectedPlayers.Count == 0 ? "Choose recipients or enable everyone in the lobby."
+            : BuyOwn && new[] { Shop.NormalShop, Shop.EmoteShop }.Any(shop => shop && Enabled(shop.ChestType) && shop.ChestIsReady && !shop.CanAffordChest)
+                ? "Waiting for enough points." : "Watching for ready chests.";
+    }
+
+    private void TickLobby(float now)
+    {
+        var lobby = LobbyData.Current.IsValid ? LobbyData.Current.SteamId.m_SteamID : 0;
+        if (_lobby != lobby)
+        {
+            _lobby = lobby;
+            _policy.NewLobby();
+            _giftStates.Clear();
+            _sentAt.Clear();
+            Activity.LeaveLobby();
+            _chestViews = Array.Empty<OpenChestForMember>();
+            _nextViewRefresh = 0;
+        }
+        if (lobby != 0 && (Gift || _sentAt.Count > 0))
+            TickGifts(now, Gift && Error == null && GameAccess.Ready && !_balance.Pending && _balance.Healthy);
     }
 
     private void TickGifts(float now, bool allowSend)
@@ -262,7 +264,10 @@ internal sealed class AutomationService
         _nextOwn = Time.realtimeSinceStartup + 0.25f;
     }
 
-    public IEnumerable<UserData> Players() => !LobbyData.Current.IsValid
+    public IEnumerable<UserData> Players() => (Plugin.Instance?.Available(Feature.Gifts) ?? false)
+        ? PlayersFromLobby() : Enumerable.Empty<UserData>();
+
+    private static IEnumerable<UserData> PlayersFromLobby() => !LobbyData.Current.IsValid
         ? Enumerable.Empty<UserData>()
         : MultiplayerLobbyReferences.GameplayInstances.Keys.Where(user => !user.IsMe);
 }

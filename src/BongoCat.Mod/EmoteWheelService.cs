@@ -10,8 +10,8 @@ namespace BongoCatMod;
 
 internal sealed class EmoteWheelService
 {
-    private static readonly FieldInfo Entries = GameAccess.RequiredField(typeof(EmoteDonut), "IDtoEmoteEntry");
-    private static readonly FieldInfo Capacity = GameAccess.RequiredField(typeof(EmoteDonut), "maxEmoteCount");
+    private static FieldInfo Entries => GameAccess.RequiredField(typeof(EmoteDonut), "IDtoEmoteEntry");
+    private static FieldInfo Capacity => GameAccess.RequiredField(typeof(EmoteDonut), "maxEmoteCount");
     private readonly ModSettings _settings;
     private readonly ManualLogSource _log;
     private readonly HashSet<int> _pinned;
@@ -19,6 +19,7 @@ internal sealed class EmoteWheelService
     private EmoteDonut? _readyWheel;
     private int _validationDepth;
     private float _nextRefresh;
+    private int _originalCapacity;
 
     public string Status { get; private set; } = "Select emotes to add to your native wheel.";
 
@@ -32,7 +33,9 @@ internal sealed class EmoteWheelService
 
     public void OnReady(EmoteDonut wheel)
     {
+        if (!(Plugin.Instance?.Available(Feature.Wheel) ?? false)) return;
         _readyWheel = wheel;
+        _originalCapacity = (int)Capacity.GetValue(wheel);
         Capacity.SetValue(wheel, int.MaxValue);
         var pager = wheel.GetComponent<WheelPager>() ?? wheel.gameObject.AddComponent<WheelPager>();
         pager.Initialize(wheel);
@@ -43,14 +46,15 @@ internal sealed class EmoteWheelService
         _validationDepth > 0 && item.IsEmote && _pinned.Contains(item.Id);
 
     public bool Contains(EmoteDonut wheel, int id) => GetEntries(wheel).ContainsKey(id);
-    public bool Contains(int id) => EmoteDonut.Instance && Contains(EmoteDonut.Instance, id);
+    public bool Contains(int id) => (Plugin.Instance?.Available(Feature.Wheel) ?? false) && EmoteDonut.Instance && Contains(EmoteDonut.Instance, id);
 
     public int[] OrderIds(IEnumerable<int> available) => CosmeticPreferences.Order(available, _order);
 
-    public int[] ItemIds => EmoteDonut.Instance ? OrderIds(GetEntries(EmoteDonut.Instance).Keys) : Array.Empty<int>();
+    public int[] ItemIds => (Plugin.Instance?.Available(Feature.Wheel) ?? false) && EmoteDonut.Instance ? OrderIds(GetEntries(EmoteDonut.Instance).Keys) : Array.Empty<int>();
 
     public void Move(int id, int targetIndex)
     {
+        Plugin.Instance!.Require(Feature.Wheel);
         _order = CosmeticPreferences.Move(ItemIds, id, targetIndex);
         _settings.WheelOrder.Value = CosmeticPreferences.WriteIds(_order);
         _settings.Save();
@@ -69,6 +73,7 @@ internal sealed class EmoteWheelService
 
     public void Toggle(SteamItemRuntime item)
     {
+        Plugin.Instance!.Require(Feature.Wheel);
         if (!item.IsEmote && !Contains(item.Id)) throw new ArgumentException("Choose a standard emote.", nameof(item));
         var wheel = EmoteDonut.Instance;
         if (!wheel || _readyWheel != wheel || !CatInventory.Instance || !CatInventory.Instance.IsInitialized)
@@ -99,6 +104,7 @@ internal sealed class EmoteWheelService
 
     public void Tick()
     {
+        if (!(Plugin.Instance?.Available(Feature.Wheel) ?? false)) return;
         if (Time.realtimeSinceStartup < _nextRefresh) return;
         _nextRefresh = Time.realtimeSinceStartup + 2f;
         var wheel = EmoteDonut.Instance;
@@ -122,6 +128,14 @@ internal sealed class EmoteWheelService
 
     private static Dictionary<int, EmoteDonutEntry> GetEntries(EmoteDonut wheel) =>
         (Dictionary<int, EmoteDonutEntry>)Entries.GetValue(wheel);
+
+    public void Deactivate()
+    {
+        if (!_readyWheel) return;
+        _readyWheel!.GetComponent<WheelPager>()?.RestoreNative();
+        Capacity.SetValue(_readyWheel, _originalCapacity);
+        _readyWheel = null;
+    }
 
     private void Save()
     {
