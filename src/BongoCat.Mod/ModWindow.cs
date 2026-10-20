@@ -89,7 +89,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         _cosmeticView = Mathf.Clamp(_settings.CosmeticView.Value, 0, 2);
         _scrollPositions = _settings.ReadScroll();
         NativeStyle.Font = Resources.FindObjectsOfTypeAll<TMP_Text>().Select(t => t.font).First(f => f);
-        _canvas = new GameObject("Bongo Cat Mods", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        _canvas = new GameObject("BongoPlus", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         _canvas.layer = 5;
         _canvas.transform.SetParent(transform, false);
         var canvas = _canvas.GetComponent<Canvas>();

@@ -8,7 +8,10 @@ $projectRoot = Split-Path $PSScriptRoot -Parent
 if ($LASTEXITCODE -ne 0) { throw 'Plugin build failed.' }
 & dotnet run --project (Join-Path $projectRoot 'tests/BongoCat.Mod.Tests/BongoCat.Mod.Tests.csproj') -c Release -p:UseSharedCompilation=false
 if ($LASTEXITCODE -ne 0) { throw 'Regression checks failed.' }
-$package = Join-Path $projectRoot 'artifacts/BongoCatMods'
+$package = [IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts/BongoPlus-package'))
+$artifactsRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts'))
+if (-not $package.StartsWith($artifactsRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid package output path.' }
+if (Test-Path -LiteralPath $package) { Remove-Item -LiteralPath $package -Recurse -Force }
 New-Item -ItemType Directory -Path $package -Force | Out-Null
 $loader = Join-Path $projectRoot 'vendor/BepInEx-5.4.23.5'
 foreach ($name in @('winhttp.dll', 'doorstop_config.ini', 'BepInEx')) {
@@ -27,5 +30,5 @@ New-Item -ItemType Directory -Path $loaderConfig -Force | Out-Null
 $plugins = Join-Path $package 'BepInEx/plugins/BongoCatMods'
 New-Item -ItemType Directory -Path $plugins -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot 'src/BongoCat.Mod/bin/Release/net472/BongoCat.Mod.dll') -Destination $plugins -Force
-Compress-Archive -Path (Join-Path $package '*') -DestinationPath (Join-Path $projectRoot 'artifacts/BongoCatMods-0.3.0.zip') -Force
+Compress-Archive -Path (Join-Path $package '*') -DestinationPath (Join-Path $projectRoot 'artifacts/BongoPlus-1.0.0.zip') -Force
 Write-Output "Package ready: $package"

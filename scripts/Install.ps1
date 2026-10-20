@@ -14,12 +14,13 @@ if ((Get-FileHash -LiteralPath $assembly -Algorithm SHA256).Hash.ToLowerInvarian
 if (Get-Process -Name BongoCat -ErrorAction SilentlyContinue) {
     throw 'Close Bongo Cat before installing or updating the plugin.'
 }
-$package = Join-Path $projectRoot 'artifacts/BongoCatMods'
+$package = Join-Path $projectRoot 'artifacts/BongoPlus-package'
 if (-not (Test-Path -LiteralPath (Join-Path $package 'BepInEx/plugins/BongoCatMods/BongoCat.Mod.dll'))) {
     throw 'Run scripts/Build.ps1 first.'
 }
-$marker = Join-Path $game 'BepInEx/config/local.bongocat.mods.install.json'
-if ((Test-Path -LiteralPath (Join-Path $game 'winhttp.dll')) -and -not (Test-Path -LiteralPath $marker)) {
+$marker = Join-Path $game 'BepInEx/config/bongoplus.install.json'
+$legacyMarker = Join-Path $game 'BepInEx/config/local.bongocat.mods.install.json'
+if ((Test-Path -LiteralPath (Join-Path $game 'winhttp.dll')) -and -not (Test-Path -LiteralPath $marker) -and -not (Test-Path -LiteralPath $legacyMarker)) {
     throw 'An existing loader is installed. Review it before replacing any loader files.'
 }
 $records = [System.Collections.Generic.List[object]]::new()
@@ -46,6 +47,7 @@ if ($loaderConfigText -match '(?m)^UnityLogListening\s*=') {
 }
 [IO.File]::WriteAllText($loaderConfig, $loaderConfigText, [Text.UTF8Encoding]::new($false))
 New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
-[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = '0.3.0'; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
+[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = '1.0.0'; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $marker -Encoding utf8
+if (Test-Path -LiteralPath $legacyMarker) { Remove-Item -LiteralPath $legacyMarker }
 Write-Output 'Installed. Launch Bongo Cat normally through Steam, then click Mods in the game menu.'
