@@ -1,9 +1,10 @@
 [CmdletBinding()]
-param([string]$GameDirectory = 'D:\Gaming\Launchers\Steam\steamapps\common\BongoCat')
+param([string]$GameDirectory)
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
-$game = (Resolve-Path -LiteralPath $GameDirectory).Path
+. (Join-Path $PSScriptRoot 'Resolve-GameDirectory.ps1')
+$game = Resolve-BongoCatDirectory $GameDirectory
 $assembly = Join-Path $game 'BongoCat_Data/Managed/Assembly-CSharp.dll'
 if (-not (Test-Path -LiteralPath $assembly)) {
     throw 'This package requires the Windows Mono edition of Bongo Cat.'

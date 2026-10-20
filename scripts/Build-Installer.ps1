@@ -1,12 +1,13 @@
 [CmdletBinding()]
 param(
-    [string]$GameDirectory = 'D:\Gaming\Launchers\Steam\steamapps\common\BongoCat',
+    [string]$GameDirectory,
+    [string]$UnityEditorDirectory,
     [switch]$SkipBuild
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
-if (-not $SkipBuild) { & (Join-Path $PSScriptRoot 'Build.ps1') -GameDirectory $GameDirectory }
+if (-not $SkipBuild) { & (Join-Path $PSScriptRoot 'Build.ps1') -GameDirectory $GameDirectory -UnityEditorDirectory $UnityEditorDirectory }
 $iconPath = Join-Path $projectRoot 'src/BongoPlus.Installer/app.ico'
 if (-not (Test-Path -LiteralPath $iconPath)) {
     Add-Type -AssemblyName System.Drawing

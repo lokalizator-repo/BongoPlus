@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <GameDirectory Condition="'$(GameDirectory)' == '' and '$(BONGO_CAT_DIRECTORY)' != ''">$(BONGO_CAT_DIRECTORY)</GameDirectory>
+    <GameDirectory Condition="'$(GameDirectory)' == ''">$([System.Environment]::GetEnvironmentVariable('ProgramFiles(x86)'))/Steam/steamapps/common/BongoCat</GameDirectory>
+    <ManagedDirectory>$(GameDirectory)/BongoCat_Data/Managed</ManagedDirectory>
+    <LoaderDirectory>$(MSBuildThisFileDirectory)vendor/BepInEx-5.4.23.5/BepInEx/core</LoaderDirectory>
+  </PropertyGroup>
+  <Target Name="ValidateGameReferences" BeforeTargets="ResolveAssemblyReferences" Condition="'$(RequiresGameAssemblies)' == 'true'">
+    <Error Condition="!Exists('$(ManagedDirectory)/Assembly-CSharp.dll')" Text="Bongo Cat managed assemblies were not found. Pass -p:GameDirectory=&quot;path to BongoCat&quot; or set BONGO_CAT_DIRECTORY." />
+    <Error Condition="!Exists('$(LoaderDirectory)/BepInEx.dll')" Text="BepInEx references are missing. Run scripts/Get-Loader.ps1 first." />
+  </Target>
+</Project>

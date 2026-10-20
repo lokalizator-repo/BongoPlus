@@ -3,10 +3,8 @@
     <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <RequiresGameAssemblies>true</RequiresGameAssemblies>
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
-    <GameDirectory Condition="'$(GameDirectory)' == ''">D:/Gaming/Launchers/Steam/steamapps/common/BongoCat</GameDirectory>
-    <ManagedDirectory>$(GameDirectory)/BongoCat_Data/Managed</ManagedDirectory>
-    <LoaderDirectory>$(MSBuildThisFileDirectory)../../vendor/BepInEx-5.4.23.5/BepInEx/core</LoaderDirectory>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/BongoCat.Mod/BongoCat.Mod.csproj" />

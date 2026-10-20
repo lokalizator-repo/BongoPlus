@@ -4,6 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RequiresGameAssemblies>true</RequiresGameAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/BongoCat.Mod/BalanceMath.cs" Link="BalanceMath.cs" />
@@ -17,14 +18,14 @@
     <Compile Include="../../src/BongoCat.Mod/GameApiContracts.cs" Link="GameApiContracts.cs" />
     <Compile Include="../../src/BongoCat.Mod/WheelLayout.cs" Link="WheelLayout.cs" />
     <Compile Include="../../src/BongoCat.Mod/ControlButtonArt.cs" Link="ControlButtonArt.cs" />
-    <Reference Include="BepInEx"><HintPath>../../vendor/BepInEx-5.4.23.5/BepInEx/core/BepInEx.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.CoreModule"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/UnityEngine.CoreModule.dll</HintPath></Reference>
-    <Reference Include="UnityEngine"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/UnityEngine.dll</HintPath></Reference>
-    <Reference Include="D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/UnityEngine.*Module.dll" />
-    <Reference Include="Assembly-CSharp"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/Assembly-CSharp.dll</HintPath></Reference>
-    <Reference Include="Heathen.Steamworks"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/Heathen.Steamworks.dll</HintPath></Reference>
-    <Reference Include="UnityEngine.UI"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/UnityEngine.UI.dll</HintPath></Reference>
-    <Reference Include="Unity.TextMeshPro"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/Unity.TextMeshPro.dll</HintPath></Reference>
-    <Reference Include="com.rlabrecque.steamworks.net"><HintPath>D:/Gaming/Launchers/Steam/steamapps/common/BongoCat/BongoCat_Data/Managed/com.rlabrecque.steamworks.net.dll</HintPath></Reference>
+    <Reference Include="BepInEx"><HintPath>$(LoaderDirectory)/BepInEx.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(ManagedDirectory)/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(ManagedDirectory)/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="$(ManagedDirectory)/UnityEngine.*Module.dll" />
+    <Reference Include="Assembly-CSharp"><HintPath>$(ManagedDirectory)/Assembly-CSharp.dll</HintPath></Reference>
+    <Reference Include="Heathen.Steamworks"><HintPath>$(ManagedDirectory)/Heathen.Steamworks.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(ManagedDirectory)/UnityEngine.UI.dll</HintPath></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(ManagedDirectory)/Unity.TextMeshPro.dll</HintPath></Reference>
+    <Reference Include="com.rlabrecque.steamworks.net"><HintPath>$(ManagedDirectory)/com.rlabrecque.steamworks.net.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

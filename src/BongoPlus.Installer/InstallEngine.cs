@@ -222,6 +222,9 @@ internal sealed class InstallEngine
     private static bool Allowed(string path) => path.Equals("winhttp.dll", StringComparison.OrdinalIgnoreCase) ||
         path.Equals("doorstop_config.ini", StringComparison.OrdinalIgnoreCase) || path.Equals(ConfigPath, StringComparison.OrdinalIgnoreCase) ||
         path.Equals(PluginPath, StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("BepInEx/plugins/BongoCatMods/legal/", StringComparison.OrdinalIgnoreCase) &&
+        (path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
+         path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) ||
         (path.StartsWith("BepInEx/core/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("BepInEx/unstripped_corlib/", StringComparison.OrdinalIgnoreCase)) &&
         (path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
 

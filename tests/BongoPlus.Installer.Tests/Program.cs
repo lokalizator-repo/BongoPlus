@@ -21,7 +21,8 @@ MemoryStream Package(string version, string? extra = null)
 {
     var stream = new MemoryStream();
     using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, true))
-        foreach (var path in new[] { "winhttp.dll", "doorstop_config.ini", InstallEngine.PluginPath, "BepInEx/config/BepInEx.cfg", "BepInEx/core/BepInEx.dll" }.Concat(extra == null ? Array.Empty<string>() : new[] { extra }))
+        foreach (var path in new[] { "winhttp.dll", "doorstop_config.ini", InstallEngine.PluginPath, "BepInEx/config/BepInEx.cfg", "BepInEx/core/BepInEx.dll",
+            "BepInEx/plugins/BongoCatMods/legal/LICENSE.txt" }.Concat(extra == null ? Array.Empty<string>() : new[] { extra }))
         {
             using var writer = new StreamWriter(archive.CreateEntry(path).Open(), new UTF8Encoding(false));
             writer.Write(path == "BepInEx/config/BepInEx.cfg" ? "[Logging]\nUnityLogListening = false\n" : path == "winhttp.dll" ? "loader" : version);
@@ -90,7 +91,8 @@ try
     File.WriteAllText(FileAt("winhttp.dll"), "unknown loader");
     Check(Rejects(() => update.Install(game, (_, _) => { })) && File.ReadAllText(FileAt("winhttp.dll")) == "unknown loader", "An unknown loader is never replaced automatically");
     File.Delete(FileAt("winhttp.dll"));
-    foreach (var invalid in new[] { "../escape.dll", "BepInEx/core/../../escape.dll", "C:/escape.dll", "BongoCat.exe", "BepInEx/plugins/Other.dll" })
+    foreach (var invalid in new[] { "../escape.dll", "BepInEx/core/../../escape.dll", "C:/escape.dll", "BongoCat.exe", "BepInEx/plugins/Other.dll",
+        "BepInEx/plugins/BongoCatMods/legal/hidden.dll" })
     {
         using var zip = Package("bad", invalid);
         Check(Rejects(() => new InstallEngine(zip)), "Package rejects unexpected or escaping path: " + invalid);
@@ -121,6 +123,16 @@ try
         var installed = InstallEngine.ReadManifest(productionGame)!;
         Check(installed.Files.Count > 20 && new FileInfo(InstallEngine.Target(productionGame, InstallEngine.PluginPath)).Length > 50000,
             "The portable EXE contains the full production plugin and loader package");
+        var legal = Path.Combine(productionGame, "BepInEx", "plugins", "BongoCatMods", "legal");
+        Check(File.ReadAllText(Path.Combine(legal, "LICENSE.txt")).Contains("MIT License") &&
+            File.Exists(Path.Combine(legal, "THIRD_PARTY_NOTICES.md")) && File.Exists(Path.Combine(legal, "THIRD_PARTY_MANIFEST.json")) &&
+            Directory.GetFiles(Path.Combine(legal, "licenses"), "*.txt").Length >= 8,
+            "The distributed package installs its license, third-party notices and binary inventory");
+        using (var source = ZipFile.OpenRead(Path.Combine(legal, "sources", "UnityDoorstop-4.5.0-source.zip")))
+            Check(source.Entries.Any(entry => entry.FullName.EndsWith("/LICENSE")) &&
+                source.Entries.Any(entry => entry.FullName.EndsWith("/build.ps1")) &&
+                source.Entries.Any(entry => entry.FullName.Contains("/src/windows/")),
+                "The package includes UnityDoorstop source code and its build scripts");
         packaged.Uninstall(productionGame, (_, _) => { });
         Check(!InstallEngine.Installed(productionGame) && File.ReadAllText(savedConfig) == "Котик=993", "The embedded production package installs and uninstalls while preserving settings");
     }
