@@ -189,6 +189,25 @@ internal static class NativeStyle
         label.alignment = TextAlignmentOptions.MidlineLeft;
         return label;
     }
+
+    public static void FitLabel(TMP_Text label, bool hideWhenEmpty = false)
+    {
+        if (hideWhenEmpty)
+        {
+            var visible = !string.IsNullOrWhiteSpace(label.text);
+            if (label.gameObject.activeSelf != visible) label.gameObject.SetActive(visible);
+            if (!visible) return;
+        }
+        label.alignment = TextAlignmentOptions.TopLeft;
+        label.textWrappingMode = TextWrappingModes.Normal;
+        var parent = (RectTransform)label.transform.parent;
+        var width = Mathf.Max(1, parent.rect.width);
+        var height = Mathf.Ceil(label.GetPreferredValues(label.text, width, float.PositiveInfinity).y + 2);
+        var layout = label.GetComponent<LayoutElement>();
+        layout.minHeight = 0;
+        layout.flexibleHeight = 0;
+        if (!Mathf.Approximately(layout.preferredHeight, height)) layout.preferredHeight = height;
+    }
 }
 
 internal sealed class ModTextTheme : ThemedComponent

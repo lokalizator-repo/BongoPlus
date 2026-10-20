@@ -225,6 +225,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         if (_balance) _balance.text = "Available points: " + GameAccess.Balance.ToString("N0", CultureInfo.InvariantCulture);
         if (_detail && _plugin.Available(Feature.Balance)) _detail.text = _plugin.Balance.Status +
             "\nMax balance: " + Math.Max(0, BalanceMath.Maximum - (int)GameAccess.Spent.GetValue(Pets.Instance)).ToString("N0");
+        if (_detail) NativeStyle.FitLabel(_detail, true);
         if (_applyBalance) _applyBalance.interactable = _plugin.Available(Feature.Balance) && GameAccess.Ready && !_plugin.Balance.Pending;
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Available(Feature.Balance) && _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
@@ -337,8 +338,8 @@ internal sealed partial class ModWindow : MonoBehaviour
             _plugin.Balance.Restore();
             _error = null;
         }));
-        _detail = NativeStyle.Label(_body, "", 54, 12);
-        _detail.textWrappingMode = TextWrappingModes.Normal;
+        _detail = NativeStyle.Label(_body, "", 0, 12);
+        NativeStyle.FitLabel(_detail, true);
     }
 
     private void Lobby()

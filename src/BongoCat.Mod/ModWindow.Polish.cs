@@ -13,26 +13,48 @@ internal sealed partial class ModWindow
     private bool FeatureNotice(Feature feature)
     {
         if (_plugin.Available(feature)) return true;
-        NativeStyle.Label(_body, feature + " is unavailable after this game update.\n" + _plugin.Compatibility.Reason(feature), 90, 13)
-            .textWrappingMode = TextWrappingModes.Normal;
+        NativeStyle.FitLabel(NativeStyle.Label(_body, feature + " is unavailable after this game update.\n" +
+            _plugin.Compatibility.Reason(feature), 0, 13));
         return false;
     }
 
     private void CompatibilityDetails()
     {
-        var button = NativeStyle.Button(_body, "Compatibility details", () => { });
-        var details = NativeStyle.Label(_body, _plugin.Compatibility.Summary, 260, 12);
-        details.textWrappingMode = TextWrappingModes.Normal;
+        var button = NativeStyle.NavButton(_body, "Show compatibility details", ControlIcon.Next, () => { });
+        var details = NativeStyle.Label(_body, _plugin.Compatibility.Summary, 0, 12);
+        details.name = "Compatibility details";
+        NativeStyle.FitLabel(details);
         details.gameObject.SetActive(false);
-        button.onClick.AddListener(() => details.gameObject.SetActive(!details.gameObject.activeSelf));
-        _refreshers.Add(() =>
+        void Refresh()
         {
             details.text = _plugin.Compatibility.Summary;
-            details.GetComponent<LayoutElement>().preferredHeight = Mathf.Max(220,
-                details.GetPreferredValues(details.text, 370, float.PositiveInfinity).y + 12);
-            button.GetComponentInChildren<TMP_Text>().text = _plugin.Compatibility.KnownBuild
-                ? "Compatibility details" : "Game updated · compatibility details";
+            NativeStyle.FitLabel(details);
+            button.GetComponentInChildren<TMP_Text>().text = (details.gameObject.activeSelf ? "Hide" : "Show") +
+                (_plugin.Compatibility.KnownBuild ? " compatibility details" : " game update details");
+            button.transform.Find("Icon").localRotation = Quaternion.Euler(0, 0, details.gameObject.activeSelf ? -90 : 0);
+        }
+        button.onClick.AddListener(() =>
+        {
+            details.gameObject.SetActive(!details.gameObject.activeSelf);
+            Refresh();
+            RevealContent((RectTransform)button.transform);
         });
+        _refreshers.Add(Refresh);
+    }
+
+    private void RevealContent(RectTransform heading)
+    {
+        if (_restoreScroll != null) { StopCoroutine(_restoreScroll); _restoreScroll = null; }
+        _building = false;
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_body);
+        Canvas.ForceUpdateCanvases();
+        var top = _body.InverseTransformPoint(heading.position).y + heading.rect.height * (1 - heading.pivot.y);
+        var maximum = Mathf.Max(0, _body.rect.height - _scroll.viewport.rect.height);
+        _scroll.velocity = Vector2.zero;
+        _body.anchoredPosition = new Vector2(0, Mathf.Clamp(_body.rect.yMax - top, 0, maximum));
+        _scrollPositions[ScrollIndex] = _body.anchoredPosition.y;
+        StateChanged();
     }
 
     private void StateChanged()
@@ -121,28 +143,32 @@ internal sealed partial class ModWindow
     private void AutomationDetails()
     {
         NativeStyle.Label(_body, "ACTIVITY", 25, 16);
-        var summary = NativeStyle.Label(_body, _plugin.Automation.Summary, 48, 12);
-        summary.textWrappingMode = TextWrappingModes.Normal;
-        var state = NativeStyle.Label(_body, "", 56, 12);
-        state.textWrappingMode = TextWrappingModes.Normal;
+        var summary = NativeStyle.Label(_body, _plugin.Automation.Summary, 0, 12);
+        var state = NativeStyle.Label(_body, "", 0, 12);
+        summary.name = "Activity summary";
+        state.name = "Activity state";
         var retry = NativeStyle.Button(_body, "Resume after error", () => _plugin.Run(() =>
         {
             _plugin.Automation.Retry();
             _error = null;
         }));
         Hint(retry.transform, "Resume the previous automation options after a final error. Pending gifts are never paid again.");
-        var history = NativeStyle.Label(_body, "", 160, 11);
-        history.textWrappingMode = TextWrappingModes.Normal;
+        var history = NativeStyle.Label(_body, "", 0, 11);
+        history.name = "Activity history";
         Hint(summary.transform, "Session totals reset on restart. Gifts sent counts requests; ready cleared is not confirmation of item delivery.");
-        _refreshers.Add(() =>
+        void Refresh()
         {
             summary.text = _plugin.Automation.Summary;
             state.text = _plugin.Automation.Error ?? _plugin.Automation.Status;
             retry.gameObject.SetActive(_plugin.Automation.Error != null);
             retry.interactable = _plugin.Automation.CanRetry;
             history.text = _plugin.Automation.Recent;
-        });
-        retry.gameObject.SetActive(_plugin.Automation.Error != null);
+            NativeStyle.FitLabel(summary);
+            NativeStyle.FitLabel(state, true);
+            NativeStyle.FitLabel(history, true);
+        }
+        _refreshers.Add(Refresh);
+        Refresh();
     }
 
     private void CreatePresets()
