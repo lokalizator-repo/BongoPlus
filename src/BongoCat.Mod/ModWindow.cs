@@ -28,6 +28,7 @@ internal sealed partial class ModWindow : MonoBehaviour
     private TextMeshProUGUI _pageLabel = null!;
     private TMP_InputField _search = null!;
     private Button _menuButton = null!;
+    private RectTransform _menuClip = null!;
     private string _slot = "skin";
     private int _page;
     private int _tab;
@@ -197,6 +198,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         label.fontSize = 13;
         Destroy(label.GetComponent<ModTextTheme>());
         button.gameObject.AddComponent<NativeMenuButton>().Initialize(button.transform.Find("Icon").GetComponent<Graphic>(), label);
+        _menuClip = RoundedMenuClip.Wrap(rect);
         Hint(button.transform, "Open Mods");
     }
 
@@ -571,6 +573,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         if (_settings != null) SaveState();
         if (_ownsRenderDemand && _renderOwner) _renderOwner.TryPauseRendering();
         if (_canvas) Destroy(_canvas);
-        if (_menuButton) Destroy(_menuButton.gameObject);
+        if (_menuClip) Destroy(_menuClip.gameObject);
+        else if (_menuButton) Destroy(_menuButton.gameObject);
     }
 }
