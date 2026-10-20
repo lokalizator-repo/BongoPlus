@@ -90,8 +90,8 @@ internal static class NativeStyle
         Offsets(label.rectTransform, new Vector2(32, 4), new Vector2(-5, -4));
         var glyph = Rect("Icon", button.transform);
         glyph.anchorMin = glyph.anchorMax = new Vector2(0, 0.5f);
-        glyph.pivot = new Vector2(0, 0.5f);
-        glyph.anchoredPosition = new Vector2(5, 0);
+        glyph.pivot = new Vector2(0.5f, 0.5f);
+        glyph.anchoredPosition = new Vector2(17, 0);
         glyph.sizeDelta = new Vector2(24, 24);
         glyph.gameObject.AddComponent<RoundedGraphic>().Initialize(icon, false);
         glyph.GetComponent<RoundedGraphic>().raycastTarget = false;
