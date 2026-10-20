@@ -10,9 +10,7 @@
 ![Windows x64](docs/images/windows.svg)
 [![MIT license](docs/images/license.svg)](LICENSE)
 
-### [Download BongoPlus.exe](https://github.com/lokalizator-repo/BongoPlus/releases/latest/download/BongoPlus.exe)
-
-[All releases](https://github.com/lokalizator-repo/BongoPlus/releases) · [Report an issue](https://github.com/lokalizator-repo/BongoPlus/issues)
+[Report an issue](https://github.com/lokalizator-repo/BongoPlus/issues)
 
 <img src="docs/images/cosmetics.png" width="400" alt="BongoPlus cosmetics catalog inside Bongo Cat">
 
@@ -38,8 +36,8 @@
 
 ## Install in three steps
 
-1. Download **[BongoPlus.exe](https://github.com/lokalizator-repo/BongoPlus/releases/latest/download/BongoPlus.exe)** from Releases.
-2. Close Bongo Cat, open the installer, and click **Install BongoPlus**. It finds the game across your Steam libraries; use **Browse** if needed.
+1. Close Bongo Cat and open **BongoPlus.exe**, the portable installer distributed through GitHub Releases.
+2. Click **Install BongoPlus**. It finds the game across your Steam libraries; use **Browse** if needed.
 3. Launch Bongo Cat through Steam and open **Mods** in the game menu.
 
 <p align="center">
@@ -97,7 +95,7 @@ Major API or engine changes can still require a BongoPlus update. The tested cli
 
 Found a problem? [Open an issue](https://github.com/lokalizator-repo/BongoPlus/issues) with your BongoPlus version, what happened, and steps to reproduce it. If attaching `BepInEx/LogOutput.log`, remove Steam IDs, player names, or other personal information first.
 
-For builds and tests, see **[BUILDING.md](BUILDING.md)**. For feature compatibility, see **[the compatibility notes](analysis/COMPATIBILITY.md)**.
+For builds and tests, see **[BUILDING.md](BUILDING.md)**.
 
 ## License
 

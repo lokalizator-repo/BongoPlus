@@ -1,1 +1,3 @@
 licenses/*.txt -text -whitespace
+*.png binary
+*.ico binary

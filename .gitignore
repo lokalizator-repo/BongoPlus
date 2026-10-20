@@ -1,5 +1,5 @@
-analysis/raw/
-analysis/decompiled/
+/analysis/
+/docs/DEVELOPMENT_HISTORY.md
 .scratch/
 vendor/
 artifacts/
