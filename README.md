@@ -10,7 +10,7 @@
 ![Windows x64](docs/images/windows.svg)
 [![MIT license](docs/images/license.svg)](LICENSE)
 
-<img src="docs/images/cosmetics.png" width="400" alt="BongoPlus cosmetics catalog inside Bongo Cat">
+<a href="docs/images/cosmetics.png"><img src="docs/images/cosmetics.png" width="500" alt="BongoPlus cosmetics catalog inside Bongo Cat"></a>
 
 </div>
 
@@ -29,8 +29,10 @@ Settings are saved between launches. The mod runs inside the game; no background
 ## Screenshots
 
 <p align="center">
-  <img src="docs/images/presets.png" width="400" alt="Saved appearance presets with cat and hat previews">
-  <img src="docs/images/emote-wheel.png" width="400" alt="BongoPlus emote wheel editor with paged slots">
+  <a href="docs/images/presets.png"><img src="docs/images/presets.png" width="500" alt="Saved appearance presets with cat and hat previews"></a>
+</p>
+<p align="center">
+  <a href="docs/images/emote-wheel.png"><img src="docs/images/emote-wheel.png" width="500" alt="BongoPlus emote wheel editor with paged slots"></a>
 </p>
 
 ## Installation
@@ -42,7 +44,7 @@ Release installers are distributed through GitHub Releases.
 3. Launch Bongo Cat through Steam and open **Mods** in the game menu.
 
 <p align="center">
-  <img src="docs/images/installer.png" width="478" alt="BongoPlus portable installer with automatic Steam game detection">
+  <a href="docs/images/installer.png"><img src="docs/images/installer.png" width="640" alt="BongoPlus portable installer with automatic Steam game detection"></a>
 </p>
 
 The portable installer includes the plugin and loader. You can close it after installation.
