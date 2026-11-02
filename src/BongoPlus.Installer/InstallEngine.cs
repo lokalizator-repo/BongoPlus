@@ -27,12 +27,12 @@ internal sealed class InstallManifest
 
 internal sealed class InstallEngine
 {
-    internal const string Version = "1.0.0";
+    internal const string Version = "1.0.1";
     internal const string PluginPath = "BepInEx/plugins/BongoCatMods/BongoCat.Mod.dll";
     internal const string MarkerPath = "BepInEx/config/bongoplus.install.json";
     private const string LegacyMarker = "BepInEx/config/local.bongocat.mods.install.json";
     private const string ConfigPath = "BepInEx/config/BepInEx.cfg";
-    private const string KnownAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
+    private const string KnownAssembly = "3ae33d93def6346f715256d2b65192097632059252eed969c2641f63b946d4dd";
     private readonly Dictionary<string, byte[]> _payload;
 
     internal InstallEngine(Stream archive)

@@ -15,10 +15,12 @@ internal sealed class WheelPager : MonoBehaviour
     private static FieldInfo Entries => GameAccess.RequiredField(typeof(EmoteDonut), "IDtoEmoteEntry");
     private static FieldInfo Parent => GameAccess.RequiredField(typeof(EmoteDonut), "emoteEntryParent");
     private static FieldInfo Radius => GameAccess.RequiredField(typeof(EmoteDonut), "radius");
-    private static FieldInfo IsOpen => GameAccess.RequiredField(typeof(EmoteDonut), "_isOpen");
+    private static FieldInfo IsOpen => GameAccess.RequiredField(typeof(EmoteDonut), "IsOpen");
     private static FieldInfo ActivelyClosed => GameAccess.RequiredField(typeof(EmoteDonut), "_activelyClosed");
     private static FieldInfo ShowWheel => GameAccess.RequiredField(typeof(EmoteDonut), "_showEmoteWheel");
     private static FieldInfo Menu => GameAccess.RequiredField(typeof(EmoteDonut), "_menu");
+    private static FieldInfo CounterBar => GameAccess.RequiredField(typeof(EmoteDonut), "_counterBar");
+    private static FieldInfo OpenWithButton => GameAccess.RequiredField(typeof(EmoteDonut), "_openWithButton");
     private readonly Dictionary<int, RectTransform> _wrappers = new Dictionary<int, RectTransform>();
     private EmoteDonut _wheel = null!;
     private RectTransform _parent = null!;
@@ -80,7 +82,7 @@ internal sealed class WheelPager : MonoBehaviour
 
     public void Open()
     {
-        if (Opened || (bool)ActivelyClosed.GetValue(_wheel) || _ids.Length == 0) return;
+        if (Opened || _ids.Length == 0) return;
         IsOpen.SetValue(_wheel, true);
         Reflow();
         Present();
@@ -207,6 +209,7 @@ internal sealed class WheelPager : MonoBehaviour
     private void Present()
     {
         var open = Opened;
+        ((GameObject)CounterBar.GetValue(_wheel)).SetActive(!open || !(bool)OpenWithButton.GetValue(_wheel));
         for (var i = 0; i < _ids.Length; i++)
         {
             var wrapper = _wrappers[_ids[i]];

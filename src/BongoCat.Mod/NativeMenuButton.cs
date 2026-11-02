@@ -33,15 +33,15 @@ internal sealed class NativeMenuButton : ThemedComponent, IPointerEnterHandler, 
     {
         var button = GetComponent<Button>();
         var image = GetComponent<Image>();
-        var background = Resolve(_open ? UiSpriteRole.TabButtonSelected : _hovered ? UiSpriteRole.TabButtonHover : UiSpriteRole.TabButtonDefault, theme, legacy);
+        var background = Resolve(ThemeRoles.Sprite(_open ? "TabButtonSelected" : _hovered ? "TabButtonHover" : "TabButtonDefault"), theme, legacy);
         if (background) image.sprite = background;
         button.transition = Selectable.Transition.ColorTint;
-        if (_label && TryResolve(UiFontRole.Body, theme, legacy, out var font))
+        if (_label && TryResolve(ThemeRoles.Font("Body"), theme, legacy, out var font))
         {
             _label.font = ModFonts.Prepare(font.Font);
             if (font.Material) _label.fontSharedMaterial = font.Material;
         }
-        var role = _open ? UiColorRole.TabButtonIconSelected : _hovered ? UiColorRole.TabButtonIconHover : UiColorRole.TabButtonIconDefault;
+        var role = ThemeRoles.Color(_open ? "TabButtonIconSelected" : _hovered ? "TabButtonIconHover" : "TabButtonIconDefault");
         if (TryResolve(role, theme, legacy, out var color))
         {
             if (_icon) _icon.color = color;

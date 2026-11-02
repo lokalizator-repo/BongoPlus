@@ -9,7 +9,7 @@ $assembly = Join-Path $game 'BongoCat_Data/Managed/Assembly-CSharp.dll'
 if (-not (Test-Path -LiteralPath $assembly)) {
     throw 'This package requires the Windows Mono edition of Bongo Cat.'
 }
-if ((Get-FileHash -LiteralPath $assembly -Algorithm SHA256).Hash.ToLowerInvariant() -ne '96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8') {
+if ((Get-FileHash -LiteralPath $assembly -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3ae33d93def6346f715256d2b65192097632059252eed969c2641f63b946d4dd') {
     Write-Warning 'This game build has not been verified. The plugin will check feature compatibility at startup.'
 }
 if (Get-Process -Name BongoCat -ErrorAction SilentlyContinue) {
@@ -48,7 +48,8 @@ if ($loaderConfigText -match '(?m)^UnityLogListening\s*=') {
 }
 [IO.File]::WriteAllText($loaderConfig, $loaderConfigText, [Text.UTF8Encoding]::new($false))
 New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force | Out-Null
-[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = '1.0.0'; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
+$pluginVersion = ([xml](Get-Content -LiteralPath (Join-Path $projectRoot 'src/BongoCat.Mod/BongoCat.Mod.csproj') -Raw)).Project.PropertyGroup.Version
+[pscustomobject]@{ loader = 'BepInEx 5.4.23.5'; plugin = $pluginVersion; installedUtc = [DateTime]::UtcNow.ToString('o'); files = $records } |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $marker -Encoding utf8
 if (Test-Path -LiteralPath $legacyMarker) { Remove-Item -LiteralPath $legacyMarker }
 Write-Output 'Installed. Launch Bongo Cat normally through Steam, then click Mods in the game menu.'

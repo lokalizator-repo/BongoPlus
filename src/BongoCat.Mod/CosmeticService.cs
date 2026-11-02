@@ -130,9 +130,10 @@ internal sealed class CosmeticService
         if (!Cat.Instance || !Cat.Instance.emoteSpawner || !Cat.Instance.emoteSpawner.gameObject.activeInHierarchy)
             throw new InvalidOperationException("Wait for your cat to load.");
         Cat.Instance.emoteSpawner.SpawnEmoteParticle(item);
-        SteamMultiplayer.SendEmote(item);
         var inLobby = LobbyData.Current.IsValid;
-        EmoteStatus = item.ItemName + (inLobby ? " — sent to lobby." : " — local emote; join a lobby to share.");
+        if (inLobby && item.IsOwned) SteamMultiplayer.SendEmote(item);
+        EmoteStatus = item.ItemName + (!inLobby ? " — local emote; join a lobby to share." :
+            item.IsOwned ? " — lobby emote requested." : " — local only; lobby display requires Steam Inventory ownership.");
         _log.LogInfo("Emote requested: item=" + item.Id + ", lobby=" +
             (inLobby ? LobbyData.Current.SteamId.ToString() : "none") + ".");
     }
@@ -198,16 +199,26 @@ internal sealed class CosmeticService
         var lobby = LobbyData.Current;
         if (!lobby.IsValid) { SetStatus("Appearance selected. Join a lobby to share it."); return; }
         var synchronized = true;
+        var localOnly = false;
         foreach (var pair in _selected)
         {
             var me = lobby.Me;
-            var value = Math.Max(-1, pair.Value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var id = pair.Value;
+            if (id >= 0 && !SteamItemIdReference.Inst[id].IsOwned)
+            {
+                localOnly = true;
+                id = CatCosmetics.Instance ? CatCosmetics.Instance.EquippedItems
+                    .FirstOrDefault(item => item.ItemSlot == pair.Key && item.IsOwned)?.Id ?? -1 : -1;
+            }
+            var value = Math.Max(-1, id).ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (me[pair.Key] == value) continue;
             synchronized = false;
             me[pair.Key] = value;
             _log.LogInfo("Cosmetic metadata submitted: lobby=" + lobby.SteamId + ", slot=" + pair.Key + ", item=" + value + ".");
         }
-        SetStatus(synchronized ? "Appearance matches your Steam lobby data." : "Appearance sent to Steam. Waiting for lobby data.");
+        if (SteamMultiplayer.Instance) SteamMultiplayer.Instance.ItemOwnership.RefreshLocalProof();
+        SetStatus(localOnly ? "Unowned cosmetics stay local. Owned items are submitted for lobby verification." :
+            synchronized ? "Owned appearance submitted for lobby verification." : "Appearance sent to Steam. Waiting for lobby data.");
     }
 
     public void Restore()
@@ -239,6 +250,7 @@ internal sealed class CosmeticService
             var me = LobbyData.Current.Me;
             me[slot] = (item?.Id ?? -1).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+        if (SteamMultiplayer.Instance) SteamMultiplayer.Instance.ItemOwnership.RefreshLocalProof();
     }
 
     private void SetStatus(string value)

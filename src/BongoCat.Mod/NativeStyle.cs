@@ -30,12 +30,12 @@ internal static class NativeStyle
         rect.anchoredPosition = min + Vector2.Scale(rect.sizeDelta, rect.pivot);
     }
 
-    public static Image Image(RectTransform rect, UiSpriteRole role)
+    public static Image Image(RectTransform rect, string role)
     {
         var image = rect.gameObject.AddComponent<Image>();
         image.type = UnityEngine.UI.Image.Type.Sliced;
         image.raycastTarget = true;
-        rect.gameObject.AddComponent<ThemedImage>().SetRole(role);
+        rect.gameObject.AddComponent<ThemedImage>().SetRole(ThemeRoles.Sprite(role));
         return image;
     }
 
@@ -101,7 +101,7 @@ internal static class NativeStyle
     private static Button CreateButton(Transform parent, string title, UnityEngine.Events.UnityAction click, float width)
     {
         var rect = Rect(title, parent);
-        var image = Image(rect, UiSpriteRole.FooterButtonDefault);
+        var image = Image(rect, "FooterButtonDefault");
         var button = rect.gameObject.AddComponent<Button>();
         button.targetGraphic = image;
         var colors = button.colors;
@@ -120,7 +120,7 @@ internal static class NativeStyle
     {
         var rect = Rect("Input", parent);
         rect.gameObject.SetActive(false);
-        var image = Image(rect, UiSpriteRole.FooterButtonDefault);
+        var image = Image(rect, "FooterButtonDefault");
         var viewport = Rect("Viewport", rect);
         Stretch(viewport, 7);
         viewport.gameObject.AddComponent<RectMask2D>();
@@ -215,8 +215,8 @@ internal sealed class ModTextTheme : ThemedComponent
     public override void Apply(UiTheme theme, UiTheme legacy)
     {
         var text = GetComponent<TMP_Text>();
-        if (TryResolve(UiColorRole.NormalText, theme, legacy, out var color)) text.color = color;
-        if (TryResolve(UiFontRole.Body, theme, legacy, out var entry))
+        if (TryResolve(ThemeRoles.Color("NormalText"), theme, legacy, out var color)) text.color = color;
+        if (TryResolve(ThemeRoles.Font("Body"), theme, legacy, out var entry))
         {
             text.font = ModFonts.Prepare(entry.Font);
             if (entry.Material) text.fontSharedMaterial = entry.Material;

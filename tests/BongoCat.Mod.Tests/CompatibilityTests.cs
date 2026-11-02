@@ -55,6 +55,12 @@ internal static class CompatibilityTests
             "Incompatible stats block dependent spending paths while cosmetic features remain available");
         check(Rejects(() => payments.Require(Feature.Gifts)), "UI actions cannot bypass a failed dependency contract");
 
+        var interfaceFailure = new FeatureCompatibility();
+        interfaceFailure.Check(Feature.Interface, () => throw new TypeLoadException("Theme role changed"));
+        check(!interfaceFailure.Available(Feature.Interface) && interfaceFailure.Available(Feature.Appearance) &&
+            interfaceFailure.Available(Feature.Wheel) && interfaceFailure.Reason(Feature.Interface) == "Theme role changed",
+            "Theme API failures are diagnosed independently without disabling local appearance or the wheel");
+
         var liveContracts = new FeatureCompatibility();
         GameApiContracts.Check(liveContracts);
         check(Enum.GetValues<Feature>().All(liveContracts.Available),

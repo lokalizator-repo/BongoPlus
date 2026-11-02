@@ -17,8 +17,8 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "1.0.0";
-    private const string ExpectedAssembly = "96bbcbb2733988fd31ce261891eb3027888389e03b6a23dbd63e9e7f518adfb8";
+    public const string Version = "1.0.1";
+    private const string ExpectedAssembly = "3ae33d93def6346f715256d2b65192097632059252eed969c2641f63b946d4dd";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
     internal AutomationService Automation = null!;
@@ -82,7 +82,7 @@ public sealed class Plugin : BaseUnityPlugin
         if (_failed) return;
         try
         {
-            if (!_window && !_uiFailed && Time.realtimeSinceStartup >= _nextInit)
+            if (!_window && !_uiFailed && Available(Feature.Interface) && Time.realtimeSinceStartup >= _nextInit)
             {
                 _nextInit = Time.realtimeSinceStartup + 2f;
                 if (BongoCat.UiThemes.UiThemeManager.Instance && NativeUiReady())
@@ -95,6 +95,7 @@ public sealed class Plugin : BaseUnityPlugin
         }
         catch (Exception error)
         {
+            Compatibility.Disable(Feature.Interface, error.GetBaseException().Message);
             Logger.LogError(error);
             if (_window) Destroy(_window);
             _uiFailed = true;

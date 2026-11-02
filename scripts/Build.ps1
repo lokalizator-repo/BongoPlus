@@ -54,5 +54,6 @@ $components = foreach ($file in Get-ChildItem -LiteralPath $package -File -Recur
 }
 [pscustomobject]@{ bepinex = '5.4.23.5'; monoProfile = 'Unity Editor 6000.5.6f1 / unityjit-win32'; components = @($components) } |
     ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $legal 'THIRD_PARTY_MANIFEST.json') -Encoding utf8
-Compress-Archive -Path (Join-Path $package '*') -DestinationPath (Join-Path $projectRoot 'artifacts/BongoPlus-1.0.0.zip') -Force
+$packageVersion = ([xml](Get-Content -LiteralPath (Join-Path $projectRoot 'src/BongoCat.Mod/BongoCat.Mod.csproj') -Raw)).Project.PropertyGroup.Version
+Compress-Archive -Path (Join-Path $package '*') -DestinationPath (Join-Path $projectRoot "artifacts/BongoPlus-$packageVersion.zip") -Force
 Write-Output "Package ready: $package"

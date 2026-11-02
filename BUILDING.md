@@ -18,7 +18,7 @@ dotnet build tests/BongoCat.Mod.RuntimeTests -c Release
 
 Without an explicit path or environment variable, direct project builds use the standard Steam folder under Program Files (x86). Missing references produce a diagnostic explaining how to set the path. The PowerShell build scripts also discover custom Steam library locations automatically.
 
-`scripts/Build.ps1` builds the plugin, runs its regression checks, and creates `artifacts/BongoPlus-1.0.0.zip`. `scripts/Build-Installer.ps1` embeds that ZIP in `artifacts/BongoPlus.exe` and runs installation checks against its actual embedded payload. `-SkipBuild` reuses an already prepared ZIP; use it only when the plugin and package are current.
+`scripts/Build.ps1` builds the plugin, runs its regression checks, and creates `artifacts/BongoPlus-<version>.zip` using the plugin project's version. `scripts/Build-Installer.ps1` embeds that ZIP in `artifacts/BongoPlus.exe` and runs installation checks against its actual embedded payload. `-SkipBuild` reuses an already prepared ZIP; use it only when the plugin and package are current.
 
 The release contains license texts, component hashes, and UnityDoorstop's corresponding upstream source archive. First-time dependency setup downloads only the pinned official loader and source archives and verifies their SHA-256 hashes. The runtime test plugin is never part of a release.
 

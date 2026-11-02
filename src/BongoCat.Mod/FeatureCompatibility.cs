@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace BongoCatMod;
 
-internal enum Feature { Catalog, Appearance, Sharing, Emotes, Wheel, Balance, Automation, Gifts, Previews, Input }
+internal enum Feature { Catalog, Appearance, Sharing, Emotes, Wheel, Balance, Automation, Gifts, Previews, Input, Interface }
 
 internal sealed class FeatureCompatibility
 {

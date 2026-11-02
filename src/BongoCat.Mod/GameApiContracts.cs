@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using BongoCat;
 using BongoCat.Multiplayer;
+using BongoCat.UiThemes;
 using Heathen.SteamworksIntegration;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -23,6 +25,7 @@ internal static class GameApiContracts
         features.Check(Feature.Gifts, Gifts);
         features.Check(Feature.Previews, Previews);
         features.Check(Feature.Input, () => ApiContract.Property(typeof(Helper.InputFieldCache), "FocusingInputField", typeof(bool)));
+        features.Check(Feature.Interface, Interface);
     }
 
     private static void Catalog()
@@ -56,6 +59,10 @@ internal static class GameApiContracts
         ApiContract.Property(typeof(LobbyData), "IsValid", typeof(bool));
         ApiContract.Property(typeof(LobbyData), "Me", typeof(LobbyMemberData));
         ApiContract.Property(typeof(LobbyMemberData), "Item", typeof(string), true, typeof(string));
+        ApiContract.Property(typeof(SteamItemRuntime), "IsOwned", typeof(bool));
+        ApiContract.Field(typeof(SteamMultiplayer), "Instance", typeof(SteamMultiplayer), true);
+        ApiContract.Field(typeof(SteamMultiplayer), "ItemOwnership", typeof(LobbyItemOwnership));
+        ApiContract.Method(typeof(LobbyItemOwnership), "RefreshLocalProof", typeof(void), false);
     }
 
     private static void Emotes()
@@ -63,6 +70,7 @@ internal static class GameApiContracts
         ApiContract.Method(typeof(EmoteSpawner), "SpawnEmoteParticle", typeof(void), false, typeof(SteamItemRuntime));
         ApiContract.Method(typeof(SteamMultiplayer), "SendEmote", typeof(void), true, typeof(SteamItemRuntime));
         ApiContract.Field(typeof(Cat), "emoteSpawner", typeof(EmoteSpawner));
+        ApiContract.Property(typeof(SteamItemRuntime), "IsOwned", typeof(bool));
     }
 
     private static void Wheel()
@@ -71,10 +79,12 @@ internal static class GameApiContracts
         ApiContract.Field(typeof(EmoteDonut), "maxEmoteCount", typeof(int));
         ApiContract.Field(typeof(EmoteDonut), "emoteEntryParent", typeof(Transform));
         ApiContract.Field(typeof(EmoteDonut), "radius", typeof(float));
-        ApiContract.Field(typeof(EmoteDonut), "_isOpen", typeof(bool));
+        ApiContract.Field(typeof(EmoteDonut), "IsOpen", typeof(bool));
         ApiContract.Field(typeof(EmoteDonut), "_activelyClosed", typeof(bool));
         ApiContract.Field(typeof(EmoteDonut), "_showEmoteWheel", typeof(PlayerPrefsToggle));
         ApiContract.Field(typeof(EmoteDonut), "_menu", typeof(GameObject));
+        ApiContract.Field(typeof(EmoteDonut), "_counterBar", typeof(GameObject));
+        ApiContract.Field(typeof(EmoteDonut), "_openWithButton", typeof(bool));
         foreach (var name in new[] { "Open", "Close", "RearrangeEmotes", "Update", "Validate" })
             ApiContract.Method(typeof(EmoteDonut), name, typeof(void), false);
         ApiContract.Method(typeof(EmoteDonut), "Start", typeof(IEnumerator), false);
@@ -120,5 +130,21 @@ internal static class GameApiContracts
         foreach (var name in new[] { "_bodyImage", "_rightPawImage", "_hatImage" }) ApiContract.Field(typeof(Cat), name, typeof(Image));
         foreach (var name in new[] { "_catNormalDefault", "_catNormalFrontDefault" }) ApiContract.Field(typeof(Cat), name, typeof(Sprite));
         ApiContract.Field(typeof(SteamItemRuntime), "FullImage", typeof(Sprite));
+    }
+
+    private static void Interface()
+    {
+        ApiContract.Property(typeof(UiThemeManager), "Instance", typeof(UiThemeManager));
+        ApiContract.Method(typeof(ThemedImage), "SetRole", typeof(void), false, typeof(SpriteRole));
+        ApiContract.Method(typeof(ThemedComponent), "Resolve", typeof(Sprite), true, typeof(SpriteRole), typeof(UiTheme), typeof(UiTheme));
+        ApiContract.Method(typeof(ThemedComponent), "TryResolve", typeof(bool), true,
+            typeof(ColorRole), typeof(UiTheme), typeof(UiTheme), typeof(Color).MakeByRefType());
+        ApiContract.Method(typeof(ThemedComponent), "TryResolve", typeof(bool), true,
+            typeof(FontRole), typeof(UiTheme), typeof(UiTheme), typeof(UiTheme.FontEntry).MakeByRefType());
+        ApiContract.Field(typeof(UiTheme.FontEntry), "Font", typeof(TMP_FontAsset));
+        ApiContract.Field(typeof(UiTheme.FontEntry), "Material", typeof(Material));
+        ApiContract.Field(typeof(UiTheme), "Sprites", typeof(List<UiTheme.SpriteEntry>));
+        ApiContract.Field(typeof(UiTheme), "Colors", typeof(List<UiTheme.ColorEntry>));
+        ApiContract.Field(typeof(UiTheme), "Fonts", typeof(List<UiTheme.FontEntry>));
     }
 }

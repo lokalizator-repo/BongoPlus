@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using BepInEx;
 using BongoCat;
+using BongoCat.UiThemes;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
@@ -79,6 +80,7 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         var wait = Time.realtimeSinceStartup + 8;
         while (!window && Time.realtimeSinceStartup < wait) { yield return null; window = _plugin.GetComponent<ModWindow>(); }
         Check(window, "Mod window initialized for layout checks.");
+        VerifyUpdatedUi(window);
         _originalScroll = (float[])((float[])AccessTools.Field(typeof(ModWindow), "_scrollPositions").GetValue(window)).Clone();
         var layoutChecks = VerifyLayout(window);
         while (layoutChecks.MoveNext()) yield return layoutChecks.Current;
@@ -150,5 +152,58 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         toggle.onClick.Invoke();
         yield return new WaitForSeconds(0.6f);
         Check(!details.gameObject.activeSelf, "Compatibility collapses without retaining an empty text block.");
+    }
+
+    private void VerifyUpdatedUi(ModWindow window)
+    {
+        var button = (Button)AccessTools.Field(typeof(ModWindow), "_menuButton").GetValue(window);
+        Check(button && button.gameObject.scene.IsValid(), "Mods menu button is attached to the live game menu.");
+        UiThemeManager.Instance.Redraw(button.GetComponent<NativeMenuButton>());
+        Check(button.GetComponent<Image>().sprite && button.GetComponentInChildren<TMP_Text>(true).font,
+            "Mods menu button has its native sprite and font after the theme API update.");
+        Check(ThemeRoles.Sprite("PopupBackground") && ThemeRoles.Sprite("FooterButtonDefault") &&
+            ThemeRoles.Color("NormalText") && ThemeRoles.Color("TabButtonIconDefault") && ThemeRoles.Font("Body"),
+            "Required ScriptableObject theme roles resolve from loaded game assets.");
+        button.onClick.Invoke();
+        var panel = (RectTransform)AccessTools.Field(typeof(ModWindow), "_panel").GetValue(window);
+        Check(panel.gameObject.activeSelf, "Clicking Mods opens the mod window.");
+        button.onClick.Invoke();
+        Check(!panel.gameObject.activeSelf, "Clicking Mods again closes the mod window.");
+
+        if (_plugin.Wheel.ItemIds.Length == 0)
+        {
+            _results.Add("SKIP Wheel open-state checks require at least one configured emote.");
+            return;
+        }
+        var wheel = EmoteDonut.Instance;
+        var pager = wheel.GetComponent<WheelPager>();
+        var buttonMode = AccessTools.Field(typeof(EmoteDonut), "_openWithButton");
+        var closed = AccessTools.Field(typeof(EmoteDonut), "_activelyClosed");
+        var counter = (GameObject)AccessTools.Field(typeof(EmoteDonut), "_counterBar").GetValue(wheel);
+        var originalMode = (bool)buttonMode.GetValue(wheel);
+        var originalOpen = wheel.IsOpen;
+        var originalClosed = (bool)closed.GetValue(wheel);
+        var originalCounter = counter.activeSelf;
+        try
+        {
+            pager.Close();
+            buttonMode.SetValue(wheel, true);
+            closed.SetValue(wheel, true);
+            wheel.Open();
+            Check(wheel.IsOpen && !counter.activeSelf, "Button-opened paged wheel replaces the counter even after an explicit close.");
+            AccessTools.Method(typeof(EmoteDonut), "Close").Invoke(wheel, null);
+            Check(!wheel.IsOpen && counter.activeSelf, "Closing the paged wheel restores the counter.");
+            buttonMode.SetValue(wheel, false);
+            wheel.Open();
+            Check(wheel.IsOpen && counter.activeSelf, "Hover-opened paged wheel keeps the counter visible.");
+        }
+        finally
+        {
+            pager.Close();
+            buttonMode.SetValue(wheel, originalMode);
+            if (originalOpen) pager.Open();
+            closed.SetValue(wheel, originalClosed);
+            counter.SetActive(originalCounter);
+        }
     }
 }

@@ -105,7 +105,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         _panel.pivot = new Vector2(1, 0);
         _panel.anchoredPosition = new Vector2(-30, 110);
         _panel.sizeDelta = new Vector2(420, 560);
-        NativeStyle.Image(_panel, UiSpriteRole.PopupBackground);
+        NativeStyle.Image(_panel, "PopupBackground");
 
         var header = NativeStyle.Rect("Header", _panel);
         header.anchorMin = new Vector2(0, 1);
@@ -170,7 +170,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         _tooltip = NativeStyle.Rect("Tooltip", _canvas.transform);
         _tooltip.pivot = Vector2.zero;
         _tooltip.sizeDelta = new Vector2(270, 62);
-        NativeStyle.Image(_tooltip, UiSpriteRole.PopupBackground).raycastTarget = false;
+        NativeStyle.Image(_tooltip, "PopupBackground").raycastTarget = false;
         _tooltipText = NativeStyle.Text(_tooltip, "", 12);
         NativeStyle.Stretch(_tooltipText.rectTransform, 9);
         _tooltipText.textWrappingMode = TextWrappingModes.Normal;
@@ -395,7 +395,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         }));
         share.interactable = _plugin.Available(Feature.Sharing);
         share.targetGraphic.color = _plugin.Cosmetics.Publish ? new Color(0.76f, 1f, 0.88f) : new Color(0.55f, 0.55f, 0.55f);
-        Hint(share.transform, _plugin.Cosmetics.Publish ? "Lobby sharing is on. Click to use local appearance only." : "Lobby sharing is off. Click to share your appearance.");
+        Hint(share.transform, _plugin.Cosmetics.Publish ? "Lobby sharing is on for owned items. Unowned selections stay local. Click to turn sharing off." : "Lobby sharing is off. Click to share your owned cosmetics.");
         var restore = NativeStyle.IconButton(views, ControlIcon.Reset, () => _plugin.Run(() =>
         {
             _plugin.Cosmetics.Restore();
