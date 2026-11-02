@@ -27,7 +27,7 @@ internal sealed class InstallManifest
 
 internal sealed class InstallEngine
 {
-    internal const string Version = "1.0.2";
+    internal const string Version = "1.0.1";
     internal const string PluginPath = "BepInEx/plugins/BongoCatMods/BongoCat.Mod.dll";
     internal const string MarkerPath = "BepInEx/config/bongoplus.install.json";
     private const string LegacyMarker = "BepInEx/config/local.bongocat.mods.install.json";

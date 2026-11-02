@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using BongoCat;
 using BongoCat.Multiplayer;
+using BongoCat.PawPass;
 using BongoCat.UiThemes;
 using Heathen.SteamworksIntegration;
 using TMPro;
@@ -19,6 +20,7 @@ internal static class GameApiContracts
         features.Check(Feature.Appearance, Appearance);
         features.Check(Feature.Wheel, Wheel);
         features.Check(Feature.Balance, Balance);
+        features.Check(Feature.Clicks, Clicks);
         features.Check(Feature.Automation, Automation);
         features.Check(Feature.Gifts, Gifts);
         features.Check(Feature.Previews, Previews);
@@ -86,6 +88,20 @@ internal static class GameApiContracts
         ApiContract.Field(typeof(Pets), "_totalSpent", typeof(int));
         ApiContract.Field(typeof(Pets), "_init", typeof(bool));
         ApiContract.Method(typeof(Pets), "UpdateStats", typeof(void), false);
+    }
+
+    private static void Clicks()
+    {
+        ApiContract.Method(typeof(Pets), "AddPet", typeof(void), false, typeof(int));
+        ApiContract.Field(typeof(Pets), "_onPetsAdded", typeof(UnityEngine.Events.UnityEvent<int>));
+        ApiContract.Field(typeof(PawPassManager), "Instance", typeof(PawPassManager), true);
+        ApiContract.Field(typeof(PawPassManager), "IsInitialized", typeof(bool));
+        ApiContract.Field(typeof(PawPassManager), "ActivePass", typeof(PawPassEntity));
+        ApiContract.Property(typeof(PawPassEntity), "IsJoined", typeof(bool));
+        ApiContract.Method(typeof(PawPassManager), "TapsFor", typeof(int), true, typeof(PawPassEntity));
+        ApiContract.Method(typeof(PawPassManager), "AddTaps", typeof(void), false, typeof(int));
+        ApiContract.Method(typeof(PawPassManager), "ResolveActivePass", typeof(void), false);
+        ApiContract.Method(typeof(PawPassManager), "Refresh", typeof(void), false);
     }
 
     private static void Automation()

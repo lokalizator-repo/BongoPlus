@@ -5,10 +5,12 @@ using System.IO;
 using System.Linq;
 using BepInEx;
 using BongoCat;
+using BongoCat.PawPass;
 using BongoCat.UiThemes;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Events;
 using TMPro;
 
 namespace BongoCatMod.RuntimeTests;
@@ -81,6 +83,27 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         while (!window && Time.realtimeSinceStartup < wait) { yield return null; window = _plugin.GetComponent<ModWindow>(); }
         Check(window, "Mod window initialized for layout checks.");
         VerifyOwnedEmotes();
+        var clickUntil = Time.realtimeSinceStartup + 15;
+        while (!_plugin.Balance.CanAddClicks && Time.realtimeSinceStartup < clickUntil) yield return null;
+        Check(_plugin.Balance.CanAddClicks, "Click controls wait for initialized Steam stats and Paw Pass.");
+        var added = (UnityEvent<int>)AccessTools.Field(typeof(Pets), "_onPetsAdded").GetValue(Pets.Instance);
+        var persistent = AccessTools.Field(typeof(UnityEventBase), "m_PersistentCalls").GetValue(added);
+        var calls = (IEnumerable)AccessTools.Field(persistent.GetType(), "m_Calls").GetValue(persistent);
+        Check(calls.Cast<object>().Any(call =>
+            (UnityEngine.Object)AccessTools.Field(call.GetType(), "m_Target").GetValue(call) == PawPassManager.Instance &&
+            (string)AccessTools.Field(call.GetType(), "m_MethodName").GetValue(call) == "AddTaps"),
+            "Native click event is connected to Paw Pass AddTaps in the loaded game scene.");
+        var gainedBefore = (int)GameAccess.Gained.GetValue(Pets.Instance);
+        var spentBefore = (int)GameAccess.Spent.GetValue(Pets.Instance);
+        foreach (var amount in new[] { 0, -1, int.MaxValue })
+        {
+            var rejectedClicks = false;
+            try { _plugin.Balance.AddClicks(amount); }
+            catch (ArgumentOutOfRangeException) { rejectedClicks = true; }
+            Check(rejectedClicks && !_plugin.Balance.Pending && gainedBefore == (int)GameAccess.Gained.GetValue(Pets.Instance) &&
+                spentBefore == (int)GameAccess.Spent.GetValue(Pets.Instance),
+                "Invalid click amount is rejected without changing counters or starting a save: " + amount + ".");
+        }
         VerifyUpdatedUi(window);
         _originalScroll = (float[])((float[])AccessTools.Field(typeof(ModWindow), "_scrollPositions").GetValue(window)).Clone();
         var cosmeticChecks = VerifyCosmeticsUi(window);
@@ -99,7 +122,7 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
 
         _plugin.Cosmetics.Tick();
         _plugin.Compatibility.Disable(Feature.Balance, "Runtime test: stat fields changed type.");
-        Check(!_plugin.Available(Feature.Automation) && !_plugin.Available(Feature.Gifts) &&
+        Check(!_plugin.Available(Feature.Automation) && !_plugin.Available(Feature.Gifts) && !_plugin.Available(Feature.Clicks) &&
             !Patched(typeof(ShopItem), "Callback", Feature.Automation), "Incompatible stats disabled and unpatched dependent spending paths.");
         var rejected = false;
         try { _plugin.Balance.Set(0); }
@@ -184,6 +207,15 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         {
             show.Invoke(window, new object[] { tab, false });
             yield return new WaitForSeconds(0.6f);
+            if (tab == 0)
+            {
+                var clicks = body.GetComponentsInChildren<Button>().Single(button =>
+                    button.GetComponentInChildren<TMP_Text>()?.text == "Add clicks");
+                Check(clicks.interactable, "General exposes the enabled native click action without executing it during tests.");
+                var count = clicks.transform.parent.GetComponentInChildren<TMP_InputField>();
+                Check(count && count.text == "1000000" && count.contentType == TMP_InputField.ContentType.IntegerNumber,
+                    "Click action has an editable integer count with a one-million default.");
+            }
             Canvas.ForceUpdateCanvases();
             var summary = body.Find("Activity summary").GetComponent<TMP_Text>();
             var history = body.Find("Activity history").GetComponent<TMP_Text>();

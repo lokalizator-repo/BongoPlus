@@ -3,6 +3,7 @@ using System.IO;
 using BepInEx;
 using BepInEx.Logging;
 using BongoCat;
+using BongoCat.PawPass;
 using Newtonsoft.Json;
 using Steamworks;
 
@@ -20,6 +21,8 @@ internal sealed class BalanceService : IDisposable
     public bool Pending => _waiting;
     public bool Healthy { get; private set; } = true;
     public bool HasBackup => _original != null;
+    public bool CanAddClicks => (Plugin.Instance?.Available(Feature.Clicks) ?? false) && GameAccess.Ready && !_waiting &&
+        PawPassManager.Instance && PawPassManager.Instance.IsInitialized;
 
     public BalanceService(ManualLogSource log)
     {
@@ -48,6 +51,34 @@ internal sealed class BalanceService : IDisposable
             throw new InvalidOperationException("Wait for Steam stats to finish loading or saving.");
 
         Set(Math.Max(0, _original.Gained - _original.Spent));
+    }
+
+    public void AddClicks(int amount)
+    {
+        Plugin.Instance!.Require(Feature.Clicks);
+        if (amount <= 0 || amount > BalanceMath.Maximum)
+            throw new ArgumentOutOfRangeException(nameof(amount), "Enter a click count from 1 to 2,147,483,646.");
+        if (!CanAddClicks) throw new InvalidOperationException("Wait for Steam stats and Paw Pass to finish loading or saving.");
+        var manager = PawPassManager.Instance;
+        manager.ResolveActivePass();
+        var pass = manager.ActivePass;
+        var before = pass && pass.IsJoined ? PawPassManager.TapsFor(pass) : 0;
+        if ((long)before + amount > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(amount), "Maximum click batch for the current Paw Pass is " + (int.MaxValue - before).ToString("N0") + ".");
+        if (!SteamUserStats.GetStat("BongoTap", out int gained) || !SteamUserStats.GetStat("BongoMinus", out int spent))
+            throw new InvalidOperationException("Steam could not read your current counters.");
+        SaveBackup(gained, spent);
+        Pets.Instance.AddPet(amount);
+        manager.Refresh();
+        _waiting = true;
+        Healthy = true;
+        _requestedAt = UnityEngine.Time.realtimeSinceStartup;
+        var progress = pass && pass.IsJoined ? PawPassManager.TapsFor(pass) - before : 0;
+        var saved = SteamUserStats.StoreStats();
+        Status = "Added " + amount.ToString("N0") + " clicks through the game handler. " +
+            (pass && pass.IsJoined ? "Paw Pass +" + progress.ToString("N0") + ". " : "No active joined Paw Pass. ") +
+            (saved ? "Waiting for Steam save." : "Waiting for the game's next Steam save.");
+        _log.LogInfo(Status);
     }
 
     private void SaveBackup(int gained, int spent)

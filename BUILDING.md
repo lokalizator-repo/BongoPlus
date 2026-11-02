@@ -30,4 +30,4 @@ With the game closed and BongoPlus installed, copy `BongoCat.Mod.RuntimeTests.dl
 --bongocat-compatibility-check --compat-report=C:\absolute\path\runtime-compatibility.txt
 ```
 
-Use an absolute report path without spaces, or quote the entire report argument. The checks disable automatic purchases and gifts in memory, simulate feature failures, write a report, and close the game. They do not change the balance. Normal local appearance restoration still runs during startup. Remove the test DLL before playing normally.
+Use an absolute report path without spaces, or quote the entire report argument. The checks disable automatic purchases and gifts in memory, simulate feature failures, write a report, and close the game. They do not change the balance or execute the add-clicks action. They verify the native click event's connection to Paw Pass in the loaded scene. Normal local appearance restoration still runs during startup. Remove the test DLL before playing normally.

@@ -50,7 +50,7 @@ internal static class CompatibilityTests
 
         var payments = new FeatureCompatibility();
         payments.Disable(Feature.Balance, "Counter storage changed to Int64");
-        check(!payments.Available(Feature.Automation) && !payments.Available(Feature.Gifts) &&
+        check(!payments.Available(Feature.Automation) && !payments.Available(Feature.Gifts) && !payments.Available(Feature.Clicks) &&
             payments.Available(Feature.Catalog) && payments.Available(Feature.Wheel),
             "Incompatible stats block dependent spending paths while cosmetic features remain available");
         check(Rejects(() => payments.Require(Feature.Gifts)), "UI actions cannot bypass a failed dependency contract");

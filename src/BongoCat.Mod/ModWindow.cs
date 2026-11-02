@@ -23,6 +23,7 @@ internal sealed partial class ModWindow : MonoBehaviour
     private TextMeshProUGUI _detail = null!;
     private Button _applyBalance = null!;
     private Button _restoreBalance = null!;
+    private Button _addClicks = null!;
     private readonly List<Action> _refreshers = new List<Action>();
     private RectTransform _grid = null!;
     private TextMeshProUGUI _pageLabel = null!;
@@ -228,6 +229,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         if (_detail) NativeStyle.FitLabel(_detail, true);
         if (_applyBalance) _applyBalance.interactable = _plugin.Available(Feature.Balance) && GameAccess.Ready && !_plugin.Balance.Pending;
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Available(Feature.Balance) && _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
+        if (_addClicks) _addClicks.interactable = _plugin.Balance.CanAddClicks;
         foreach (var refresh in _refreshers) refresh();
         if (_tab == 2 && _editingWheel && _wheelSignature != string.Join(",", _plugin.Wheel.ItemIds)) FillWheelEditor();
         if (_tab == 2 && _cosmeticView == 0 && _slot == "emote" && _plugin.Available(Feature.Catalog) &&
@@ -276,6 +278,7 @@ internal sealed partial class ModWindow : MonoBehaviour
         _detail = null!;
         _applyBalance = null!;
         _restoreBalance = null!;
+        _addClicks = null!;
         _grid = null!;
         _presetList = null!;
         _wheelEditor = null!;
@@ -340,6 +343,20 @@ internal sealed partial class ModWindow : MonoBehaviour
             _plugin.Balance.Restore();
             _error = null;
         }));
+        var clicks = NativeStyle.Row(_body);
+        var count = NativeStyle.Input(clicks, "1000000", "Clicks to add");
+        count.contentType = TMP_InputField.ContentType.IntegerNumber;
+        Hint(count.transform, "Number of clicks to add through the game's click handler");
+        _addClicks = NativeStyle.Button(clicks, "Add clicks", () => _plugin.Run(() =>
+        {
+            if (!int.TryParse(count.text, out var amount) || amount <= 0 || amount > BalanceMath.Maximum)
+                throw new ArgumentException("Enter a click count from 1 to 2,147,483,646.");
+            _plugin.StopAutomation();
+            _plugin.Balance.AddClicks(amount);
+            _error = null;
+        }), 110);
+        _addClicks.interactable = _plugin.Balance.CanAddClicks;
+        Hint(_addClicks.transform, "Use the native click handler to advance your active joined Paw Pass. Points stop at Steam's counter limit. Restoring balance does not undo click or pass progress.");
         _detail = NativeStyle.Label(_body, "", 0, 12);
         NativeStyle.FitLabel(_detail, true);
     }

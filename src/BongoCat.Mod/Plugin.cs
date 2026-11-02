@@ -17,7 +17,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "1.0.2";
+    public const string Version = "1.0.1";
     private const string ExpectedAssembly = "3ae33d93def6346f715256d2b65192097632059252eed969c2641f63b946d4dd";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;

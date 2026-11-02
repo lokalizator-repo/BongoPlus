@@ -6,7 +6,7 @@
 
 **Cosmetics, emotes, and chest automation for Bongo Cat.**
 
-![Version 1.0.2](docs/images/version.svg)
+![Version 1.0.1](docs/images/version.svg)
 ![Windows x64](docs/images/windows.svg)
 [![MIT license](docs/images/license.svg)](LICENSE)
 
@@ -22,11 +22,13 @@
 | **Presets** | Save local skin-and-hat combinations with visual previews and switch between them. |
 | **Emote wheel** | Add your owned Steam emotes across compact pages, including more than eight slots. Drag slots to reorder them. |
 | **Chest automation** | Open your ready chests and send chest gifts to selected players or everyone in your lobby. Choose cosmetic chests, emote chests, or both. |
-| **Point controls** | Adjust available points within the limits shown by the mod. |
+| **Points and clicks** | Adjust available points, or enter a click count and add it through the native game handler to advance your active joined Paw Pass. Steam counter limits still apply. |
 
 Settings are saved between launches. The mod runs inside the game; no background companion app is required.
 
 ## Screenshots
+
+Screenshots show v1.0.0. In v1.0.1, lobby sharing is removed and the emote selector shows only owned items.
 
 <p align="center">
   <a href="docs/images/presets.png"><img src="docs/images/presets.png" width="500" alt="Saved appearance presets with cat and hat previews"></a>
@@ -71,6 +73,8 @@ The cosmetics catalog and presets are a local fitting room. Other players see yo
 
 Available points depend on Steam's earned and spent counters. BongoPlus shows the maximum it can set; it cannot reset exhausted counters or provide unlimited points.
 
+**Add clicks** uses the game's click handler, which also updates active Paw Pass progress. Enter the number to add; the default is 1,000,000. Join and activate a pass in the game first. Setting or restoring the balance does not advance Paw Pass progress, and restoring the balance does not undo added clicks or pass progress. Paw Pass rewards and premium access still follow the game's normal requirements.
+
 Gifts spend your points and use the game's normal exchange flow. A sent request does not guarantee item delivery.
 
 </details>
@@ -80,7 +84,7 @@ Gifts spend your points and use the game's normal exchange flow. A sent request 
 
 The mod checks feature compatibility and disables incompatible features with an explanation under **General → Compatibility details**. The cosmetic catalog is read from the installed game.
 
-Game updates can require a BongoPlus update. Version 1.0.2 targets Unity Mono `6000.2.8f1`, Steam build `26374835`.
+Game updates can require a BongoPlus update. Version 1.0.1 targets Unity Mono `6000.2.8f1`, Steam build `26374835`.
 
 </details>
 
