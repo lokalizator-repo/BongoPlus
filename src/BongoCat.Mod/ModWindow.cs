@@ -34,7 +34,6 @@ internal sealed partial class ModWindow : MonoBehaviour
     private int _tab;
     private float _nextRefresh;
     private string? _error;
-    private string? _emoteFeedback;
     private BongoCat.OnDemandRenderHelper _renderOwner = null!;
     private bool _ownsRenderDemand;
     private ModSettings _settings = null!;
@@ -59,6 +58,7 @@ internal sealed partial class ModWindow : MonoBehaviour
     private int _cosmeticView;
     private int _wheelPage;
     private string _wheelSignature = "";
+    private string _emoteCatalogSignature = "";
     private RectTransform _tooltip = null!;
     private TextMeshProUGUI _tooltipText = null!;
     private Transform? _hoverOwner;
@@ -230,8 +230,10 @@ internal sealed partial class ModWindow : MonoBehaviour
         if (_restoreBalance) _restoreBalance.interactable = _plugin.Available(Feature.Balance) && _plugin.Balance.HasBackup && !_plugin.Balance.Pending;
         foreach (var refresh in _refreshers) refresh();
         if (_tab == 2 && _editingWheel && _wheelSignature != string.Join(",", _plugin.Wheel.ItemIds)) FillWheelEditor();
+        if (_tab == 2 && _cosmeticView == 0 && _slot == "emote" && _plugin.Available(Feature.Catalog) &&
+            _emoteCatalogSignature != EmoteCatalogSignature()) FillGrid();
         _status.text = _error ?? (_tab == 2
-            ? (_editingWheel ? _plugin.Wheel.Status : _slot == "emote" && _cosmeticView == 0 ? _emoteFeedback ?? _plugin.Cosmetics.EmoteStatus : _plugin.Cosmetics.Status)
+            ? (_editingWheel || _slot == "emote" && _cosmeticView == 0 ? _plugin.Wheel.Status : _plugin.Cosmetics.Status)
             : _plugin.Automation.Error ?? _plugin.Automation.Status);
     }
 
@@ -346,7 +348,7 @@ internal sealed partial class ModWindow : MonoBehaviour
     {
         if (!FeatureNotice(Feature.Gifts)) return;
         NativeStyle.Label(_body, "GIFTS", 28, 19);
-        NativeStyle.Label(_body, "Your points pay for their chest. They receive the item.", 42, 13).textWrappingMode = TextWrappingModes.Normal;
+        NativeStyle.Label(_body, "Your points pay for their chest request. Steam handles delivery.", 42, 13).textWrappingMode = TextWrappingModes.Normal;
         ToggleRow("Auto-gift ready chests", () => _plugin.Automation.Gift, v => _plugin.Automation.Gift = v);
         ToggleRow("Include everyone in this lobby", () => _plugin.Automation.AllPlayers, v => _plugin.Automation.AllPlayers = v);
         ToggleRow("Cosmetic chests", () => _plugin.Automation.Cosmetics, v => _plugin.Automation.Cosmetics = v);
@@ -371,8 +373,9 @@ internal sealed partial class ModWindow : MonoBehaviour
     {
         if (!FeatureNotice(Feature.Catalog)) return;
         var views = NativeStyle.Row(_body, 30);
+        views.name = "Cosmetics views";
         var names = new[] { "Catalog", "Presets", "Emote wheel" };
-        var title = NativeStyle.Text(views, names[_cosmeticView], 17);
+        var title = NativeStyle.Text(views, _cosmeticView == 0 && _slot == "emote" ? "Your emotes" : names[_cosmeticView], 17);
         title.alignment = TextAlignmentOptions.MidlineLeft;
         title.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
         var icons = new[] { ControlIcon.Catalog, ControlIcon.Presets, ControlIcon.Wheel };
@@ -388,22 +391,20 @@ internal sealed partial class ModWindow : MonoBehaviour
             button.targetGraphic.color = view == _cosmeticView ? new Color(0.76f, 1f, 0.88f) : Color.white;
             Hint(button.transform, names[i]);
         }
-        var share = NativeStyle.IconButton(views, ControlIcon.Share, () => _plugin.Run(() =>
+        if (_cosmeticView == 1 || _cosmeticView == 0 && _slot != "emote")
         {
-            _plugin.Cosmetics.SetPublish(!_plugin.Cosmetics.Publish);
-            ShowTab(2);
-        }));
-        share.interactable = _plugin.Available(Feature.Sharing);
-        share.targetGraphic.color = _plugin.Cosmetics.Publish ? new Color(0.76f, 1f, 0.88f) : new Color(0.55f, 0.55f, 0.55f);
-        Hint(share.transform, _plugin.Cosmetics.Publish ? "Lobby sharing is on for owned items. Unowned selections stay local. Click to turn sharing off." : "Lobby sharing is off. Click to share your owned cosmetics.");
-        var restore = NativeStyle.IconButton(views, ControlIcon.Reset, () => _plugin.Run(() =>
-        {
-            _plugin.Cosmetics.Restore();
-            FillGrid();
-            if (_presetList) FillPresets();
-        }));
-        restore.interactable = _plugin.Available(Feature.Appearance);
-        Hint(restore.transform, "Restore your normally equipped skin and hat");
+            var restore = NativeStyle.IconButton(views, ControlIcon.Reset, () => _plugin.Run(() =>
+            {
+                _plugin.Cosmetics.Restore();
+                FillGrid();
+                if (_presetList) FillPresets();
+            }));
+            restore.interactable = _plugin.Available(Feature.Appearance);
+            Hint(restore.transform, "End the local preview and restore your equipped skin and hat");
+            var notice = NativeStyle.Label(_body, "Local fitting room. Only you see this appearance.", 0, 12);
+            notice.name = "Local preview notice";
+            NativeStyle.FitLabel(notice);
+        }
         _editingWheel = _cosmeticView == 2;
         if (_editingWheel)
         {
@@ -432,9 +433,9 @@ internal sealed partial class ModWindow : MonoBehaviour
                 ShowTab(2);
             });
             button.targetGraphic.color = slot == _slot ? new Color(0.76f, 1f, 0.88f) : Color.white;
-            Hint(button.transform, slot == "emote" ? "Emotes" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(slot));
+            Hint(button.transform, slot == "emote" ? "Your owned emotes · add to the wheel" : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(slot));
         }
-        _search = NativeStyle.Input(slots, _query, "Search cosmetics");
+        _search = NativeStyle.Input(slots, _query, _slot == "emote" ? "Search your emotes" : "Search cosmetics");
         NativeStyle.Offsets(_search.textViewport, new Vector2(7, 7), new Vector2(-27, -7));
         _search.onValueChanged.AddListener(value => { _query = value; _page = 0; FillGrid(); StateChanged(); });
         var clear = NativeStyle.IconButton(_search.transform, ControlIcon.Close, () => { _search.text = ""; });
@@ -451,6 +452,12 @@ internal sealed partial class ModWindow : MonoBehaviour
             StateChanged();
         });
         Hint(_favoritesButton.transform, "Show only favorites. Starred items appear first in the full catalog too.");
+        if (_slot == "emote")
+        {
+            var note = NativeStyle.Label(_body, "Owned emotes only. Click to add or remove from your wheel.", 0, 12);
+            note.name = "Owned emotes notice";
+            NativeStyle.FitLabel(note);
+        }
         _emptyState = NativeStyle.Label(_body, "", 48, 14);
         _emptyState.textWrappingMode = TextWrappingModes.Normal;
         _grid = NativeStyle.Rect("Cosmetic grid", _body);
@@ -475,6 +482,7 @@ internal sealed partial class ModWindow : MonoBehaviour
     {
         if (!_grid) return;
         if (!_plugin.Available(Feature.Catalog)) { ShowTab(2); return; }
+        if (_slot == "emote") _emoteCatalogSignature = EmoteCatalogSignature();
         HideTooltip();
         _favoritesButton.targetGraphic.color = _favoritesOnly ? new Color(1f, 0.88f, 0.58f) : Color.white;
         foreach (Transform child in _grid) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
@@ -487,7 +495,11 @@ internal sealed partial class ModWindow : MonoBehaviour
         _previousPage.interactable = _page > 0;
         _nextPage.interactable = _page + 1 < pages;
         _emptyState.gameObject.SetActive(items.Count == 0);
-        _emptyState.text = _favoritesOnly ? "No favorite items match. Star items in All cosmetics or clear your search."
+        _emptyState.text = _slot == "emote" && CatInventory.Instance && CatInventory.Instance.FetchingItems
+            ? "Loading your Steam inventory…"
+            : _slot == "emote" && string.IsNullOrWhiteSpace(_query) && !_favoritesOnly && items.Count == 0
+            ? "No owned emotes yet. Your emotes will appear here after Steam inventory loads."
+            : _favoritesOnly ? "No favorite items match. Star items in the catalog or clear your search."
             : "No items match your search. Try another name or clear the search.";
         _grid.gameObject.SetActive(items.Count != 0);
         StateChanged();
@@ -499,18 +511,19 @@ internal sealed partial class ModWindow : MonoBehaviour
                 _error = null;
                 if (cosmetic.IsEmote)
                 {
-                    _plugin.Cosmetics.SendEmote(cosmetic);
-                    _emoteFeedback = _plugin.Cosmetics.EmoteStatus;
+                    _plugin.Wheel.Toggle(cosmetic);
                 }
                 else
                 {
                     _plugin.Cosmetics.Select(cosmetic);
-                    FillGrid();
                 }
+                FillGrid();
             }));
-            card.interactable = _plugin.Available(cosmetic.IsEmote ? Feature.Emotes : Feature.Appearance);
+            card.interactable = _plugin.Available(cosmetic.IsEmote ? Feature.Wheel : Feature.Appearance);
             card.gameObject.name = cosmetic.ItemName;
-            Hint(card.transform, cosmetic.ItemName + (cosmetic.IsEmote ? "\nClick to send. + / − changes your wheel." : "\nClick to wear and save."));
+            Hint(card.transform, cosmetic.ItemName + (cosmetic.IsEmote
+                ? _plugin.Wheel.Contains(cosmetic.Id) ? "\nClick to remove from your wheel." : "\nClick to add to your wheel."
+                : "\nPreview locally and save. Other players do not see this appearance."));
             var imageRect = NativeStyle.Rect("Icon", card.transform);
             imageRect.anchorMin = new Vector2(0, 0.26f);
             imageRect.anchorMax = Vector2.one;
@@ -520,37 +533,18 @@ internal sealed partial class ModWindow : MonoBehaviour
             image.preserveAspect = true;
             image.raycastTarget = false;
             var label = card.GetComponentInChildren<TMP_Text>();
-            label.text = (cosmetic.IsEmote && _plugin.Wheel.Contains(cosmetic.Id) ? "[Wheel] " : "") + cosmetic.ItemName;
+            label.text = cosmetic.ItemName;
             label.fontSize = 10;
             label.rectTransform.anchorMax = new Vector2(1, 0.25f);
             if (!cosmetic.IsEmote)
             {
                 NativeStyle.Stretch(imageRect, 4);
                 label.gameObject.SetActive(false);
-                var frame = NativeStyle.Rect("Selected item", card.transform);
-                NativeStyle.Stretch(frame);
-                frame.gameObject.AddComponent<RoundedGraphic>().InitializeSelection();
-                frame.gameObject.SetActive(_plugin.Cosmetics.Selected(cosmetic));
             }
-            if (cosmetic.IsEmote)
-            {
-                var toggle = NativeStyle.IconButton(card.transform,
-                    _plugin.Wheel.Contains(cosmetic.Id) ? ControlIcon.Remove : ControlIcon.Add,
-                    () => _plugin.Run(() =>
-                    {
-                        _error = null;
-                        _plugin.Wheel.Toggle(cosmetic);
-                        _emoteFeedback = _plugin.Wheel.Status;
-                        FillGrid();
-                    }));
-                toggle.interactable = _plugin.Available(Feature.Wheel);
-                var rect = (RectTransform)toggle.transform;
-                rect.anchorMin = rect.anchorMax = Vector2.one;
-                rect.pivot = Vector2.one;
-                rect.sizeDelta = new Vector2(26, 24);
-                rect.anchoredPosition = new Vector2(-3, -3);
-                Hint(toggle.transform, _plugin.Wheel.Contains(cosmetic.Id) ? "Remove from your emote wheel" : "Add to your emote wheel");
-            }
+            var frame = NativeStyle.Rect("Selected item", card.transform);
+            NativeStyle.Stretch(frame);
+            frame.gameObject.AddComponent<RoundedGraphic>().InitializeSelection();
+            frame.gameObject.SetActive(cosmetic.IsEmote ? _plugin.Wheel.Contains(cosmetic.Id) : _plugin.Cosmetics.Selected(cosmetic));
             var favorite = NativeStyle.IconButton(card.transform, ControlIcon.Favorite, () => _plugin.Run(() =>
             {
                 _plugin.Cosmetics.ToggleFavorite(cosmetic.Id);
@@ -565,6 +559,9 @@ internal sealed partial class ModWindow : MonoBehaviour
             Hint(favorite.transform, _plugin.Cosmetics.IsFavorite(cosmetic.Id) ? "Remove from favorites" : "Add to favorites");
         }
     }
+
+    private string EmoteCatalogSignature() => string.Join(",", _plugin.Cosmetics.Items("emote", "").Select(item => item.Id)) +
+        ":" + (CatInventory.Instance && CatInventory.Instance.FetchingItems) + ":" + string.Join(",", _plugin.Wheel.ItemIds);
 
     private void ToggleRow(string title, Func<bool> get, Action<bool> set, bool automation = true)
     {

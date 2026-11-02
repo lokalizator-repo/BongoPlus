@@ -71,7 +71,7 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         Check(Patched(typeof(EmoteDonut), "Open", Feature.Wheel) && Patched(typeof(ShopItem), "Callback", Feature.Automation),
             "Independent wheel and automation Harmony groups installed.");
         var until = Time.realtimeSinceStartup + 90;
-        while ((!EmoteDonut.Instance || !EmoteDonut.Instance.GetComponent<WheelPager>() || !CatInventory.Instance || !CatInventory.Instance.IsInitialized)
+        while ((!EmoteDonut.Instance || !EmoteDonut.Instance.GetComponent<WheelPager>() || !CatInventory.Instance || !CatInventory.Instance.IsInitialized || CatInventory.Instance.FetchingItems)
             && Time.realtimeSinceStartup < until) yield return null;
         Check(EmoteDonut.Instance && EmoteDonut.Instance.GetComponent<WheelPager>() && CatInventory.Instance && CatInventory.Instance.IsInitialized,
             "Native inventory and modified wheel initialized.");
@@ -80,8 +80,11 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         var wait = Time.realtimeSinceStartup + 8;
         while (!window && Time.realtimeSinceStartup < wait) { yield return null; window = _plugin.GetComponent<ModWindow>(); }
         Check(window, "Mod window initialized for layout checks.");
+        VerifyOwnedEmotes();
         VerifyUpdatedUi(window);
         _originalScroll = (float[])((float[])AccessTools.Field(typeof(ModWindow), "_scrollPositions").GetValue(window)).Clone();
+        var cosmeticChecks = VerifyCosmeticsUi(window);
+        while (cosmeticChecks.MoveNext()) yield return cosmeticChecks.Current;
         var layoutChecks = VerifyLayout(window);
         while (layoutChecks.MoveNext()) yield return layoutChecks.Current;
 
@@ -94,8 +97,6 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         Check(_plugin.Available(Feature.Appearance) && _plugin.Available(Feature.Automation) &&
             Patched(typeof(ShopItem), "Callback", Feature.Automation), "Appearance and purchase hooks survived wheel failure.");
 
-        _plugin.Compatibility.Disable(Feature.Sharing, "Runtime test: lobby metadata API changed.");
-        Check(_plugin.Available(Feature.Appearance), "Local appearance survived a sharing API failure.");
         _plugin.Cosmetics.Tick();
         _plugin.Compatibility.Disable(Feature.Balance, "Runtime test: stat fields changed type.");
         Check(!_plugin.Available(Feature.Automation) && !_plugin.Available(Feature.Gifts) &&
@@ -105,7 +106,7 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         catch (NotSupportedException) { rejected = true; }
         Check(rejected, "Disabled balance controls reject writes before accessing Steam stats.");
 
-        Check(window, "Mod window remains available when stats, sharing and wheel are incompatible.");
+        Check(window, "Mod window remains available when stats and wheel are incompatible.");
         var show = AccessTools.Method(typeof(ModWindow), "ShowTab");
         show.Invoke(window, new object[] { 0, false });
         yield return null;
@@ -113,6 +114,64 @@ public sealed class CompatibilityRuntimeChecks : BaseUnityPlugin
         yield return null;
         Check(window && _plugin.Available(Feature.Catalog) && _plugin.Available(Feature.Appearance),
             "General and Cosmetics render after independent compatibility failures.");
+    }
+
+    private void VerifyOwnedEmotes()
+    {
+        AccessTools.Field(typeof(EmoteWheelService), "_nextRefresh").SetValue(_plugin.Wheel, 0f);
+        _plugin.Wheel.Tick();
+        Check(_plugin.Cosmetics.Items("emote", "").All(item => item.IsEmote && item.IsOwned),
+            "Emote catalog contains only owned Steam emotes.");
+        Check(_plugin.Settings.ReadWheelEmotes().All(id => SteamItemIdReference.Inst[id].IsOwned) &&
+            _plugin.Wheel.ItemIds.All(id => SteamItemIdReference.Inst[id].IsOwned),
+            "Saved wheel choices and native entries contain only owned items after migration.");
+        var unowned = CatInventory.Instance.Items.FirstOrDefault(item => item.IsEmote && !item.IsOwned);
+        Check(unowned != null, "Unowned emote is available to verify wheel rejection.");
+        var before = _plugin.Wheel.ItemIds;
+        var saved = _plugin.Settings.WheelEmotes.Value;
+        var rejected = false;
+        try { _plugin.Wheel.Toggle(unowned!); }
+        catch (InvalidOperationException) { rejected = true; }
+        Check(rejected && before.SequenceEqual(_plugin.Wheel.ItemIds) && saved == _plugin.Settings.WheelEmotes.Value,
+            "Adding an unowned emote is rejected without changing the wheel or saved choices.");
+    }
+
+    private IEnumerator VerifyCosmeticsUi(ModWindow window)
+    {
+        var names = new[] { "_slot", "_cosmeticView", "_query", "_page", "_favoritesOnly" };
+        var fields = names.Select(name => AccessTools.Field(typeof(ModWindow), name)).ToArray();
+        var values = fields.Select(field => field.GetValue(window)).ToArray();
+        var show = AccessTools.Method(typeof(ModWindow), "ShowTab");
+        var body = (RectTransform)AccessTools.Field(typeof(ModWindow), "_body").GetValue(window);
+        try
+        {
+            fields[0].SetValue(window, "skin");
+            fields[1].SetValue(window, 0);
+            show.Invoke(window, new object[] { 2, false });
+            yield return null;
+            Check(body.Find("Local preview notice") && body.Find("Cosmetics views").GetComponentsInChildren<Button>().Length == 4,
+                "Cosmetics clearly labels local previews and has no lobby sharing control.");
+            fields[0].SetValue(window, "emote");
+            show.Invoke(window, new object[] { 2, false });
+            yield return null;
+            Check(body.Find("Owned emotes notice") && !body.Find("Local preview notice") &&
+                body.Find("Cosmetics views").GetComponentsInChildren<Button>().Length == 3,
+                "Owned emote catalog replaces appearance controls with wheel instructions.");
+            fields[1].SetValue(window, 2);
+            show.Invoke(window, new object[] { 2, false });
+            yield return null;
+            var editor = (RectTransform)AccessTools.Field(typeof(ModWindow), "_wheelEditor").GetValue(window);
+            var add = editor.GetChild(0).GetComponentInChildren<Button>();
+            Check(add && add.interactable, "Expanded wheel has an accessible add-emotes button even when its page is full.");
+            add.onClick.Invoke();
+            yield return null;
+            Check((string)fields[0].GetValue(window) == "emote" && (int)fields[1].GetValue(window) == 0 &&
+                body.Find("Owned emotes notice"), "Wheel add button opens the owned emote selector.");
+        }
+        finally
+        {
+            for (var i = 0; i < fields.Length; i++) fields[i].SetValue(window, values[i]);
+        }
     }
 
     private IEnumerator VerifyLayout(ModWindow window)

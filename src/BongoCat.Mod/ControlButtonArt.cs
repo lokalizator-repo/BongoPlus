@@ -2,7 +2,7 @@ using System;
 
 namespace BongoCatMod;
 
-internal enum ControlIcon { Add, Remove, Previous, Next, Favorite, Catalog, Presets, Wheel, Skin, Hat, Emote, Share, Reset, Close, Save, Trash, Settings, Lobby, Palette, Mods }
+internal enum ControlIcon { Add, Remove, Previous, Next, Favorite, Catalog, Presets, Wheel, Skin, Hat, Emote, Reset, Close, Save, Trash, Settings, Lobby, Palette, Mods }
 
 internal static class ControlButtonArt
 {
@@ -15,7 +15,6 @@ internal static class ControlButtonArt
         [ControlIcon.Skin] = new[] { new double[] { -7,-3,-7,7,-2,4,2,4,7,7,7,-3,4,-6,-4,-6,-7,-3 }, new double[] { -3,0,-3,-1 }, new double[] { 3,0,3,-1 }, new double[] { -2,-3,0,-4,2,-3 } },
         [ControlIcon.Hat] = new[] { new double[] { -8,-5,8,-5 }, new double[] { -5,-5,-4,6,4,6,5,-5 }, new double[] { -5,-2,5,-2 } },
         [ControlIcon.Emote] = new[] { new double[] { -4,-1,-2,-3,2,-3,4,-1 }, new double[] { -3,3,-3,2 }, new double[] { 3,3,3,2 } },
-        [ControlIcon.Share] = new[] { new double[] { -5,0,5,5 }, new double[] { -5,0,5,-5 } },
         [ControlIcon.Reset] = new[] { new double[] { -6,2,-6,7,-1,7 } },
         [ControlIcon.Close] = new[] { new double[] { -4,-4,4,4 }, new double[] { -4,4,4,-4 } },
         [ControlIcon.Save] = new[] { new double[] { -6,-6,6,-6,6,3,3,6,-6,6,-6,-6 }, new double[] { -3,6,-3,1,2,1,2,6 }, new double[] { -3,-6,-3,-2,3,-2,3,-6 } },
@@ -77,8 +76,6 @@ internal static class ControlButtonArt
                     distance = Math.Min(distance, Segment(x, y, path[i], path[i + 1], path[i + 2], path[i + 3]) - 0.7);
         double Circle(double cx, double cy, double radius) => Math.Abs(Math.Sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy)) - radius) - 0.7;
         if (icon == ControlIcon.Emote) distance = Math.Min(distance, Circle(0, 0, 7));
-        if (icon == ControlIcon.Share)
-            distance = Math.Min(distance, Math.Min(Circle(-5,0,1.8), Math.Min(Circle(5,5,1.8), Circle(5,-5,1.8))));
         if (icon == ControlIcon.Lobby) distance = Math.Min(distance, Math.Min(Circle(-3,3,2.6), Circle(5,3,2)));
         if (icon == ControlIcon.Wheel || icon == ControlIcon.Settings)
         {

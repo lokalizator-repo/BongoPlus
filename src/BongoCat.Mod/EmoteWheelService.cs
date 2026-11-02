@@ -17,11 +17,10 @@ internal sealed class EmoteWheelService
     private readonly HashSet<int> _pinned;
     private int[] _order;
     private EmoteDonut? _readyWheel;
-    private int _validationDepth;
     private float _nextRefresh;
     private int _originalCapacity;
 
-    public string Status { get; private set; } = "Select emotes to add to your native wheel.";
+    public string Status { get; private set; } = "Add your owned emotes to the expanded native wheel.";
 
     public EmoteWheelService(ModSettings settings, ManualLogSource log)
     {
@@ -40,10 +39,6 @@ internal sealed class EmoteWheelService
         var pager = wheel.GetComponent<WheelPager>() ?? wheel.gameObject.AddComponent<WheelPager>();
         pager.Initialize(wheel);
     }
-    public void BeginValidation() => _validationDepth++;
-    public void EndValidation() => _validationDepth = Math.Max(0, _validationDepth - 1);
-    public bool KeepDuringValidation(SteamItemRuntime item) =>
-        _validationDepth > 0 && item.IsEmote && _pinned.Contains(item.Id);
 
     public bool Contains(EmoteDonut wheel, int id) => GetEntries(wheel).ContainsKey(id);
     public bool Contains(int id) => (Plugin.Instance?.Available(Feature.Wheel) ?? false) && EmoteDonut.Instance && Contains(EmoteDonut.Instance, id);
@@ -84,6 +79,8 @@ internal sealed class EmoteWheelService
             Status = item.ItemName + " — removed from wheel.";
             return;
         }
+        if (CatInventory.Instance.FetchingItems || !item.IsOwned)
+            throw new InvalidOperationException("Only emotes in your loaded Steam inventory can be added to the wheel.");
 
         var added = _pinned.Add(item.Id);
         try
@@ -108,21 +105,35 @@ internal sealed class EmoteWheelService
         if (Time.realtimeSinceStartup < _nextRefresh) return;
         _nextRefresh = Time.realtimeSinceStartup + 2f;
         var wheel = EmoteDonut.Instance;
-        if (!wheel || _readyWheel != wheel || !CatInventory.Instance || !CatInventory.Instance.IsInitialized) return;
+        if (!wheel || _readyWheel != wheel || !CatInventory.Instance || !CatInventory.Instance.IsInitialized || CatInventory.Instance.FetchingItems) return;
+        var owned = CatInventory.Instance.Items.Where(item => item.IsEmote && item.IsOwned).ToDictionary(item => item.Id);
+        var removed = _pinned.RemoveWhere(id => !owned.ContainsKey(id));
+        foreach (var id in GetEntries(wheel).Keys.ToArray())
+        {
+            var item = SteamItemIdReference.Inst[id];
+            if (item.IsOwned) continue;
+            wheel.ToggleItem(item);
+            removed++;
+        }
         foreach (var id in _pinned.OrderBy(id => id).ToArray())
         {
             if (Contains(wheel, id)) continue;
-            var item = CatInventory.Instance.Items.FirstOrDefault(i => i.Id == id && i.IsEmote);
-            if (item == null || !item.Icon) continue;
+            var item = owned[id];
+            if (!item.Icon) continue;
             wheel.ToggleItem(item);
             _log.LogInfo("Native wheel emote restored: item=" + id + ".");
         }
         var order = ItemIds;
-        if (!_order.SequenceEqual(order))
+        if (removed > 0 || !_order.SequenceEqual(order))
         {
             _order = order;
             Save();
             wheel.GetComponent<WheelPager>()?.Refresh();
+        }
+        if (removed > 0)
+        {
+            Status = "Wheel updated to match your owned Steam emotes.";
+            _log.LogInfo("Removed unavailable saved wheel items: " + removed + ".");
         }
     }
 

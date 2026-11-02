@@ -17,8 +17,6 @@ internal static class GameApiContracts
     {
         features.Check(Feature.Catalog, Catalog);
         features.Check(Feature.Appearance, Appearance);
-        features.Check(Feature.Sharing, Sharing);
-        features.Check(Feature.Emotes, Emotes);
         features.Check(Feature.Wheel, Wheel);
         features.Check(Feature.Balance, Balance);
         features.Check(Feature.Automation, Automation);
@@ -39,6 +37,8 @@ internal static class GameApiContracts
         ApiContract.Property(typeof(SteamItemRuntime), "Id", typeof(int));
         ApiContract.Property(typeof(SteamItemRuntime), "ItemName", typeof(string));
         ApiContract.Property(typeof(SteamItemRuntime), "IsEmote", typeof(bool));
+        ApiContract.Property(typeof(SteamItemRuntime), "IsOwned", typeof(bool));
+        ApiContract.Field(typeof(CatInventory), "FetchingItems", typeof(bool));
         ApiContract.Field(typeof(SteamItemRuntime), "ItemSlot", typeof(string));
         ApiContract.Field(typeof(SteamItemRuntime), "Icon", typeof(Sprite));
     }
@@ -53,24 +53,12 @@ internal static class GameApiContracts
         ApiContract.Method(typeof(MemoryImageCache), "GetSprite", typeof(Sprite), false, typeof(string));
     }
 
-    private static void Sharing()
+    private static void Lobby()
     {
         ApiContract.Field(typeof(LobbyData), "Current", typeof(LobbyData), true);
         ApiContract.Property(typeof(LobbyData), "IsValid", typeof(bool));
         ApiContract.Property(typeof(LobbyData), "Me", typeof(LobbyMemberData));
         ApiContract.Property(typeof(LobbyMemberData), "Item", typeof(string), true, typeof(string));
-        ApiContract.Property(typeof(SteamItemRuntime), "IsOwned", typeof(bool));
-        ApiContract.Field(typeof(SteamMultiplayer), "Instance", typeof(SteamMultiplayer), true);
-        ApiContract.Field(typeof(SteamMultiplayer), "ItemOwnership", typeof(LobbyItemOwnership));
-        ApiContract.Method(typeof(LobbyItemOwnership), "RefreshLocalProof", typeof(void), false);
-    }
-
-    private static void Emotes()
-    {
-        ApiContract.Method(typeof(EmoteSpawner), "SpawnEmoteParticle", typeof(void), false, typeof(SteamItemRuntime));
-        ApiContract.Method(typeof(SteamMultiplayer), "SendEmote", typeof(void), true, typeof(SteamItemRuntime));
-        ApiContract.Field(typeof(Cat), "emoteSpawner", typeof(EmoteSpawner));
-        ApiContract.Property(typeof(SteamItemRuntime), "IsOwned", typeof(bool));
     }
 
     private static void Wheel()
@@ -113,7 +101,7 @@ internal static class GameApiContracts
 
     private static void Gifts()
     {
-        Sharing();
+        Lobby();
         ApiContract.Field(typeof(OpenChestForMember), "_targetUser", typeof(SteamUserData));
         ApiContract.Field(typeof(OpenChestForMember), "_chestType", typeof(ChestType));
         ApiContract.Field(typeof(OpenChestForMember), "_setChestActive", typeof(SetActiveBasedOnLobbyMemberValue));

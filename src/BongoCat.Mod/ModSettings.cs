@@ -14,7 +14,6 @@ internal sealed class ModSettings
     public readonly ConfigEntry<bool> EmoteChests;
     public readonly ConfigEntry<bool> AllPlayers;
     public readonly ConfigEntry<string> Recipients;
-    public readonly ConfigEntry<bool> ShareAppearance;
     public readonly ConfigEntry<string> WheelEmotes;
     public readonly ConfigEntry<string> WheelOrder;
     public readonly ConfigEntry<string> Favorites;
@@ -39,7 +38,6 @@ internal sealed class ModSettings
         EmoteChests = config.Bind("Automation", "EmoteChests", true);
         AllPlayers = config.Bind("Automation", "AllPlayers", false);
         Recipients = config.Bind("Automation", "Recipients", "");
-        ShareAppearance = config.Bind("Appearance", "ShareInLobby", true);
         WheelEmotes = config.Bind("Emotes", "WheelItems", "");
         WheelOrder = config.Bind("Emotes", "WheelOrder", "");
         Favorites = config.Bind("Cosmetics", "Favorites", "");
@@ -56,6 +54,8 @@ internal sealed class ModSettings
             Appearance.Add(slot, config.Bind("Appearance", slot, -1));
         var obsolete = config.Bind("Appearance", "bongos", -1);
         config.Remove(obsolete.Definition);
+        var obsoleteSharing = config.Bind("Appearance", "ShareInLobby", false);
+        config.Remove(obsoleteSharing.Definition);
         config.Save();
     }
 

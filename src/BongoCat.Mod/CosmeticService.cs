@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Logging;
 using BongoCat;
-using BongoCat.Multiplayer;
-using Heathen.SteamworksIntegration;
 using UnityEngine;
 
 namespace BongoCatMod;
@@ -20,32 +18,19 @@ internal sealed class CosmeticService
     private readonly HashSet<int> _favorites;
     private readonly List<AppearancePreset> _presets;
     public IReadOnlyList<AppearancePreset> Presets => _presets;
-    public bool Publish { get; private set; } = true;
-    public string Status { get; private set; } = "Using your normal equipped cosmetics.";
-    public string EmoteStatus { get; private set; } = "Click an emote to send it.";
+    public string Status { get; private set; } = "Local fitting room. Other players see your equipped Steam items.";
 
     public CosmeticService(ManualLogSource log, ModSettings settings)
     {
         _log = log;
         _settings = settings;
-        Publish = settings.ShareAppearance.Value;
         _favorites = new HashSet<int>(CosmeticPreferences.ReadIds(settings.Favorites.Value));
         _presets = CosmeticPreferences.ReadPresets(settings.Presets.Value);
     }
 
-    public void SetPublish(bool value)
-    {
-        if (value) Plugin.Instance!.Require(Feature.Sharing);
-        if (Publish == value) return;
-        Publish = value;
-        _settings.ShareAppearance.Value = value;
-        _settings.Save();
-        if (!value) RestorePublished();
-        Apply();
-    }
-
     public IEnumerable<SteamItemRuntime> Items(string slot, string search) => CatInventory.Instance
         ? CatInventory.Instance.Items.Where(item => item.ItemSlot == slot && item.Icon &&
+            (slot != "emote" || item.IsOwned) &&
             (string.IsNullOrWhiteSpace(search) || item.ItemName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0))
             .OrderBy(item => item.ItemName)
         : Enumerable.Empty<SteamItemRuntime>();
@@ -123,21 +108,6 @@ internal sealed class CosmeticService
         Apply();
     }
 
-    public void SendEmote(SteamItemRuntime item)
-    {
-        Plugin.Instance!.Require(Feature.Emotes);
-        if (!item.IsEmote) throw new ArgumentException("Choose a standard emote.", nameof(item));
-        if (!Cat.Instance || !Cat.Instance.emoteSpawner || !Cat.Instance.emoteSpawner.gameObject.activeInHierarchy)
-            throw new InvalidOperationException("Wait for your cat to load.");
-        Cat.Instance.emoteSpawner.SpawnEmoteParticle(item);
-        var inLobby = LobbyData.Current.IsValid;
-        if (inLobby && item.IsOwned) SteamMultiplayer.SendEmote(item);
-        EmoteStatus = item.ItemName + (!inLobby ? " — local emote; join a lobby to share." :
-            item.IsOwned ? " — lobby emote requested." : " — local only; lobby display requires Steam Inventory ownership.");
-        _log.LogInfo("Emote requested: item=" + item.Id + ", lobby=" +
-            (inLobby ? LobbyData.Current.SteamId.ToString() : "none") + ".");
-    }
-
     public bool Selected(SteamItemRuntime item) => _selected.TryGetValue(item.ItemSlot, out var id)
         ? id == item.Id
         : CatCosmetics.Instance && CatCosmetics.Instance.EquippedItems.Any(equipped => equipped.Id == item.Id);
@@ -189,36 +159,7 @@ internal sealed class CosmeticService
             _log.LogInfo("Saved appearance restored from local assets at " +
                 Time.realtimeSinceStartup.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "s.");
         _dirty = false;
-        if (!Publish) SetStatus("Local appearance only. Lobby sharing is off.");
-        else if (!Plugin.Instance!.Execute(Feature.Sharing, PublishSelected))
-            SetStatus("Appearance saved locally. Lobby sharing is unavailable after this game update.");
-    }
-
-    private void PublishSelected()
-    {
-        var lobby = LobbyData.Current;
-        if (!lobby.IsValid) { SetStatus("Appearance selected. Join a lobby to share it."); return; }
-        var synchronized = true;
-        var localOnly = false;
-        foreach (var pair in _selected)
-        {
-            var me = lobby.Me;
-            var id = pair.Value;
-            if (id >= 0 && !SteamItemIdReference.Inst[id].IsOwned)
-            {
-                localOnly = true;
-                id = CatCosmetics.Instance ? CatCosmetics.Instance.EquippedItems
-                    .FirstOrDefault(item => item.ItemSlot == pair.Key && item.IsOwned)?.Id ?? -1 : -1;
-            }
-            var value = Math.Max(-1, id).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (me[pair.Key] == value) continue;
-            synchronized = false;
-            me[pair.Key] = value;
-            _log.LogInfo("Cosmetic metadata submitted: lobby=" + lobby.SteamId + ", slot=" + pair.Key + ", item=" + value + ".");
-        }
-        if (SteamMultiplayer.Instance) SteamMultiplayer.Instance.ItemOwnership.RefreshLocalProof();
-        SetStatus(localOnly ? "Unowned cosmetics stay local. Owned items are submitted for lobby verification." :
-            synchronized ? "Owned appearance submitted for lobby verification." : "Appearance sent to Steam. Waiting for lobby data.");
+        SetStatus("Local preview saved. Other players do not see this appearance.");
     }
 
     public void Restore()
@@ -229,28 +170,10 @@ internal sealed class CosmeticService
         _restorePending = false;
         foreach (var entry in _settings.Appearance.Values) entry.Value = -1;
         _settings.Save();
-        RestorePublished();
         foreach (var slot in _settings.Appearance.Keys) Cat.Instance.ClearItemSlot(slot);
         foreach (var item in CatCosmetics.Instance.EquippedItems.Where(i => _settings.Appearance.ContainsKey(i.ItemSlot)))
             Cat.Instance.SetItem(item, false);
         SetStatus("Restored your normal equipped cosmetics.");
-    }
-
-    public void RestorePublished()
-    {
-        Plugin.Instance?.Execute(Feature.Sharing, RestorePublishedNative);
-    }
-
-    private void RestorePublishedNative()
-    {
-        if (!LobbyData.Current.IsValid || !CatCosmetics.Instance) return;
-        foreach (var slot in _settings.Appearance.Keys)
-        {
-            var item = CatCosmetics.Instance.EquippedItems.FirstOrDefault(i => i.ItemSlot == slot);
-            var me = LobbyData.Current.Me;
-            me[slot] = (item?.Id ?? -1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        }
-        if (SteamMultiplayer.Instance) SteamMultiplayer.Instance.ItemOwnership.RefreshLocalProof();
     }
 
     private void SetStatus(string value)

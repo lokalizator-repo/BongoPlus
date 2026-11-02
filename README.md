@@ -6,7 +6,7 @@
 
 **Cosmetics, emotes, and chest automation for Bongo Cat.**
 
-![Version 1.0.1](docs/images/version.svg)
+![Version 1.0.2](docs/images/version.svg)
 ![Windows x64](docs/images/windows.svg)
 [![MIT license](docs/images/license.svg)](LICENSE)
 
@@ -18,9 +18,9 @@
 
 | Feature | What you get |
 | --- | --- |
-| **Cosmetics** | Browse the game's skin and hat catalog, search, and save favorites. Preview any available cosmetic locally and share owned cosmetics in lobbies. |
-| **Presets** | Save skin-and-hat combinations with visual previews and switch between them. |
-| **Emote wheel** | Use more than eight emotes across compact pages. Drag slots to reorder them. |
+| **Cosmetics** | Browse the game's skin and hat catalog, search, and save favorites. Try available cosmetics locally; other players see your equipped Steam items. |
+| **Presets** | Save local skin-and-hat combinations with visual previews and switch between them. |
+| **Emote wheel** | Add your owned Steam emotes across compact pages, including more than eight slots. Drag slots to reorder them. |
 | **Chest automation** | Open your ready chests and send chest gifts to selected players or everyone in your lobby. Choose cosmetic chests, emote chests, or both. |
 | **Point controls** | Adjust available points within the limits shown by the mod. |
 
@@ -62,7 +62,7 @@ To update or uninstall, close the game and run the installer. **Remove mod** kee
 <details>
 <summary><strong>Will other players see my cosmetics?</strong></summary>
 
-Updated game clients verify cosmetic ownership through Steam Inventory. Lobby sharing submits your owned cosmetics for verification; unowned selections remain local. Other players do not need BongoPlus to see verified owned cosmetics. Custom images are not shared, and selecting a cosmetic does not add it to Steam Inventory. The same ownership requirement applies to lobby emotes.
+The cosmetics catalog and presets are a local fitting room. Other players see your normally equipped Steam items. BongoPlus does not publish your preview or add items to Steam Inventory. The expanded emote wheel uses only emotes you own, sent through the native game wheel.
 
 </details>
 
@@ -80,7 +80,7 @@ Gifts spend your points and use the game's normal exchange flow. A sent request 
 
 The mod checks feature compatibility and disables incompatible features with an explanation under **General → Compatibility details**. The cosmetic catalog is read from the installed game.
 
-Game updates can require a BongoPlus update. Version 1.0.1 targets Unity Mono `6000.2.8f1`, Steam build `26374835`.
+Game updates can require a BongoPlus update. Version 1.0.2 targets Unity Mono `6000.2.8f1`, Steam build `26374835`.
 
 </details>
 

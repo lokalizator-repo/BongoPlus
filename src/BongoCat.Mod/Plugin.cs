@@ -17,7 +17,7 @@ namespace BongoCatMod;
 public sealed class Plugin : BaseUnityPlugin
 {
     public const string Id = "local.bongocat.mods";
-    public const string Version = "1.0.1";
+    public const string Version = "1.0.2";
     private const string ExpectedAssembly = "3ae33d93def6346f715256d2b65192097632059252eed969c2641f63b946d4dd";
     internal static Plugin? Instance;
     internal BalanceService Balance = null!;
@@ -66,8 +66,8 @@ public sealed class Plugin : BaseUnityPlugin
             Patch(Feature.Automation, typeof(PurchaseFinished));
             Patch(Feature.Gifts, typeof(GiftClicked));
             if (RefreshAppearance.HasTargets) Patch(Feature.Appearance, typeof(RefreshAppearance));
-            Patch(Feature.Wheel, typeof(WheelStarted), typeof(WheelValidated), typeof(WheelRearranged), typeof(WheelOpened),
-                typeof(WheelClosed), typeof(WheelHovered), typeof(WheelEmoteRemoved), typeof(WheelEmoteToggled));
+            Patch(Feature.Wheel, typeof(WheelStarted), typeof(WheelRearranged), typeof(WheelOpened),
+                typeof(WheelClosed), typeof(WheelHovered), typeof(WheelEmoteToggled));
             Logger.LogInfo("BongoPlus " + Version + " loaded. " + Compatibility.Summary);
         }
         catch (Exception error)
@@ -215,18 +215,6 @@ public sealed class Plugin : BaseUnityPlugin
         }
     }
 
-    [HarmonyPatch(typeof(EmoteDonut), nameof(EmoteDonut.Validate))]
-    private static class WheelValidated
-    {
-        private static void Prefix() => Instance?.Execute(Feature.Wheel, () => Instance.Wheel.BeginValidation());
-
-        private static Exception? Finalizer(Exception? __exception)
-        {
-            Instance?.Execute(Feature.Wheel, () => Instance.Wheel.EndValidation());
-            return __exception;
-        }
-    }
-
     [HarmonyPatch(typeof(EmoteDonut), "RearrangeEmotes")]
     private static class WheelRearranged
     {
@@ -269,13 +257,6 @@ public sealed class Plugin : BaseUnityPlugin
             Instance?.Execute(Feature.Wheel, () => keep = __instance.GetComponent<WheelPager>()?.KeepOpenOnHover() ?? false);
             return !keep;
         }
-    }
-
-    [HarmonyPatch(typeof(EmoteDonut), "RemoveEmote")]
-    private static class WheelEmoteRemoved
-    {
-        private static bool Prefix(SteamItemRuntime steamItem) =>
-            !(Instance?.Available(Feature.Wheel) == true && (Instance.Wheel?.KeepDuringValidation(steamItem) ?? false));
     }
 
     [HarmonyPatch(typeof(EmoteDonut), nameof(EmoteDonut.ToggleItem))]

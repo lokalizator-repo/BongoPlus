@@ -43,10 +43,10 @@ internal static class CompatibilityTests
         check(!features.Execute(Feature.Wheel, () => calls++) && calls == 0 && disabledEvents == 1 &&
             features.Available(Feature.Appearance) && features.Available(Feature.Automation),
             "A broken wheel is skipped without stopping appearance or purchases and emits one failure notification");
-        features.Execute(Feature.Sharing, () => throw new MissingMethodException("Lobby metadata setter changed"));
-        check(!features.Available(Feature.Sharing) && features.Available(Feature.Appearance) &&
+        features.Execute(Feature.Gifts, () => throw new MissingMethodException("Gift API changed"));
+        check(!features.Available(Feature.Gifts) && features.Available(Feature.Appearance) &&
             features.Execute(Feature.Appearance, () => calls++),
-            "A runtime lobby error disables sharing while local cosmetics continue");
+            "A runtime gift error leaves local cosmetics available");
 
         var payments = new FeatureCompatibility();
         payments.Disable(Feature.Balance, "Counter storage changed to Int64");

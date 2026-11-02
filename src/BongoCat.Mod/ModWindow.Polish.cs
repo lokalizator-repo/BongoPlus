@@ -237,7 +237,7 @@ internal sealed partial class ModWindow
             NativeStyle.Stretch(frame);
             frame.gameObject.AddComponent<RoundedGraphic>().InitializeSelection();
             frame.gameObject.SetActive(_plugin.Cosmetics.Selected(preset));
-            Hint(apply.transform, preset.Name + "\nApply this skin and hat.");
+            Hint(apply.transform, preset.Name + "\nPreview this skin and hat locally.");
             var remove = NativeStyle.IconButton(apply.transform, ControlIcon.Trash, () => _plugin.Run(() =>
             {
                 _plugin.Cosmetics.DeletePreset(preset);
@@ -276,11 +276,25 @@ internal sealed partial class ModWindow
         _wheelSignature = string.Join(",", ids);
         var pages = WheelLayout.PageCount(ids.Length);
         _wheelPage = Mathf.Clamp(_wheelPage, 0, pages - 1);
-        NativeStyle.Label(_wheelEditor, "Drag to reorder. Drop on an arrow to move between pages.", 32, 12)
-            .textWrappingMode = TextWrappingModes.Normal;
+        var actions = NativeStyle.Row(_wheelEditor);
+        var instructions = NativeStyle.Label(actions, "Drag to reorder. Drop on an arrow to move between pages.", 32, 12);
+        instructions.textWrappingMode = TextWrappingModes.Normal;
+        var instructionsLayout = instructions.GetComponent<LayoutElement>();
+        instructionsLayout.preferredWidth = 0;
+        instructionsLayout.flexibleWidth = 1;
+        var add = NativeStyle.IconButton(actions, ControlIcon.Add, () =>
+        {
+            _cosmeticView = 0;
+            _slot = "emote";
+            _page = 0;
+            _query = "";
+            _favoritesOnly = false;
+            ShowTab(2);
+        });
+        Hint(add.transform, "Add your owned emotes to the wheel");
         if (ids.Length == 0)
         {
-            NativeStyle.Label(_wheelEditor, "Your wheel is empty. Add emotes with + in the catalog.", 42, 13)
+            NativeStyle.Label(_wheelEditor, "Your wheel is empty. Use + above to choose your emotes.", 42, 13)
                 .textWrappingMode = TextWrappingModes.Normal;
             return;
         }
